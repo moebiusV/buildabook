@@ -1,0 +1,18 @@
+#!/bin/sh
+# applypatch-msg — the git-am counterpart of commit-msg.  git am does NOT run
+# commit-msg (only git commit and git merge do), so without this hook a patch's
+# Claude/AI references would land in history.  $1 is the path to the message
+# file; edits to it are honoured by git am.
+
+msg="$1"
+[ -f "$msg" ] || exit 0
+
+# Same filter as commit-msg: drop any line that mentions Claude or Anthropic,
+# never leaving the message empty.
+grep -viE 'claude|anthropic' "$msg" > "$msg.clean" || true
+
+if [ -s "$msg.clean" ]; then
+    cat "$msg.clean" > "$msg"
+fi
+rm -f "$msg.clean"
+exit 0

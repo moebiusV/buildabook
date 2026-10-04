@@ -1,0 +1,42 @@
+#!/bin/sh
+# pre-push — keep Claude/AI fingerprints off the remote.
+#   * refuse a ref (branch/tag) whose name mentions "claude"
+#   * refuse if any outgoing commit's message, author, or committer mentions
+#     Claude or Anthropic
+# stdin: lines of "<local ref> <local sha> <remote ref> <remote sha>"
+
+z40=0000000000000000000000000000000000000000
+pat='claude|anthropic'
+
+while read local_ref local_sha remote_ref remote_sha; do
+    case "$local_ref" in
+        *[Cc]laude*)
+            echo >&2 "pre-push: refusing ref named $local_ref (mentions claude)"
+            exit 1 ;;
+    esac
+
+    [ "$local_sha" = "$z40" ] && continue          # branch/tag deletion
+
+    if [ "$remote_sha" = "$z40" ]; then
+        range="$local_sha"                          # new branch: all its commits
+    else
+        range="$remote_sha..$local_sha"
+    fi
+
+    # Message body — commit-msg/applypatch-msg strip these at commit time, so
+    # a hit here means someone bypassed a hook (--no-verify, git am, rebase).
+    if git log --format='%B' "$range" 2>/dev/null | grep -qiE "$pat"; then
+        echo >&2 "pre-push: an outgoing commit message mentions Claude/Anthropic."
+        echo >&2 "Rewrite the offending commit (git commit --amend, git rebase) and retry."
+        exit 1
+    fi
+
+    # Author and committer — no hook rewrites these, so this is the gate.
+    if git log --format='%an%n%ae%n%cn%n%ce' "$range" 2>/dev/null | grep -qiE "$pat"; then
+        echo >&2 "pre-push: an outgoing commit's author or committer mentions Claude/Anthropic."
+        echo >&2 "Rewrite it (git commit --amend --reset-author, or set a clean author) and retry."
+        exit 1
+    fi
+done
+
+exit 0

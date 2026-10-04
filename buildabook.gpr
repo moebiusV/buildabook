@@ -1,0 +1,28 @@
+--  buildabook.gpr — the outline-language book builder.
+--
+--  Reads a book's outline.txt + book.conf, resolves {{token}} cross-references,
+--  and emits a Typst book.typ plus a number_map.csv audit.  Depends on hbnf
+--  (hbnf_config.gpr), whose code templates are Mustache (mustache.gpr) — so
+--  mustache is pulled in transitively, never linked directly here.
+
+with "hbnf_config";
+
+project Buildabook is
+
+   for Languages use ("Ada");
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj";
+   for Exec_Dir use ".";
+   for Create_Missing_Dirs use "True";
+
+   for Main use ("buildabook_cli.adb");
+
+   package Builder is
+      for Executable ("buildabook_cli.adb") use "buildabook";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnat2022", "-gnatwa");
+   end Compiler;
+
+end Buildabook;

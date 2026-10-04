@@ -1,0 +1,21 @@
+# Build artifacts (gprbuild)
+/obj/
+/buildabook
+/*.ali
+/*.o
+
+# configure-generated (autoconf)
+/configure
+/Makefile
+/config.log
+/config.status
+/config.cache
+/autom4te.cache/
+
+# configure's Ada probe scratch
+/conftest.adb
+/conftest.ali
+/conftest.o
+
+# Local state
+/.work/

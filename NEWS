@@ -1,0 +1,5 @@
+buildabook NEWS — user-visible changes
+
+0.1.0  (unreleased)
+  * Initial release: outline-language book builder extracted from the three
+    book projects (recheboc, speedrun, viking-poets) into one Ada program.

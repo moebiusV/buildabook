@@ -1,0 +1,53 @@
+buildabook — installation
+
+Prerequisites
+-------------
+An Ada 2022 toolchain with the ada-on-alpine packages installed:
+
+    gcc-gnat 15.x   gprbuild   hbnf   (hbnf pulls in mustache-ada transitively)
+
+The canonical way to get these is the ada-toolchain:edge container image
+(built by the ada-on-alpine overlay).  See build.sh.
+
+Building from a release tarball
+-------------------------------
+    ./configure
+    make
+    make check        # aunit tests
+
+Building from a git checkout
+----------------------------
+A checkout has configure.ac, not the generated configure script.  Generate it
+first (requires autoconf), then build as above:
+
+    autoconf
+    ./configure
+    make
+    make check
+
+configure options
+-----------------
+    --prefix=DIR        install prefix            (default /usr/local)
+    --bindir=DIR        binaries                  (default PREFIX/bin)
+    --mandir=DIR        man pages                 (default PREFIX/share/man)
+    GPRBUILD=path       gprbuild to use           (detected)
+    GNATMAKE=path       gnatmake to use           (detected, probe only)
+    TYPST=path          Typst for `buildabook build` (detected, optional)
+
+configure checks for gprbuild, gnatmake, Ada 2022 support, and that the hbnf
+and mustache-ada gpr projects are visible to gprbuild.
+
+Installing
+----------
+    make install      # installs buildabook + man page, default /usr/local
+    make uninstall    # removes what make install put in place
+
+Distribution
+------------
+    make dist         # buildabook-<version>.tar.gz source tarball
+
+Git hooks
+---------
+The de-claude git hooks live in githooks/ and are enabled per-clone:
+
+    make install-hooks        # or: git config core.hooksPath githooks

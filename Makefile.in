@@ -1,0 +1,88 @@
+# Makefile.in — buildabook, the outline-language book builder.
+#
+# GNU packaging for an Ada 2022 project driven by gprbuild.  configure turns
+# this into Makefile by substituting the @VAR@ placeholders (the Ada toolchain
+# and the install layout).  Standard targets:
+#
+#   all      build the `buildabook` executable (gprbuild -P buildabook.gpr)
+#   check    run the aunit test suite (tests/)
+#   install  install buildabook + the man page (+ git hooks, see install-hooks)
+#   uninstall  remove what install put in place
+#   clean    remove build artifacts
+#   distclean  clean + remove the configure-generated files
+#   dist     make a buildabook-$(VERSION).tar.gz source tarball
+#
+# Honours the usual variables: PREFIX, DESTDIR, and configure's --bindir/
+# --mandir family.  Parallel-safe (all real work is one gprbuild invocation).
+
+SHELL     = /bin/sh
+
+# -- tools (substituted by configure) ---------------------------------------
+GPRBUILD  = @GPRBUILD@
+TYPST     = @TYPST@
+INSTALL   = @INSTALL@
+
+# -- package identity -------------------------------------------------------
+PACKAGE   = buildabook
+VERSION   = @VERSION@
+
+# -- install layout (substituted by configure) ------------------------------
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+bindir      = @bindir@
+datarootdir = @datarootdir@
+mandir      = @mandir@
+man1dir     = @mandir@/man1
+DESTDIR     =
+
+PROJECT    = buildabook.gpr
+BIN        = buildabook
+MANPAGE    = man/buildabook.1
+HOOKS_DIR  = githooks
+HOOKS      = commit-msg applypatch-msg pre-push
+
+# A GNAT project file is the one true build description; make just drives it.
+all: $(BIN)
+
+$(BIN): $(PROJECT) $(wildcard src/*.adb) $(wildcard src/*.ads)
+	$(GPRBUILD) -P $(PROJECT) -p
+
+check: $(BIN)
+	@if test -d tests && test -n "$$(ls tests/*.adb 2>/dev/null)"; then \
+		$(GPRBUILD) -P tests/tests.gpr -p && ./tests/tests; \
+	else \
+		echo "check: no aunit tests present yet (tests/ is empty)"; \
+	fi
+
+install: all
+	$(INSTALL) -d "$(DESTDIR)$(bindir)"
+	$(INSTALL) -m 0755 $(BIN) "$(DESTDIR)$(bindir)/$(BIN)"
+	$(INSTALL) -d "$(DESTDIR)$(man1dir)"
+	$(INSTALL) -m 0644 $(MANPAGE) "$(DESTDIR)$(man1dir)/$(BIN).1"
+
+uninstall:
+	rm -f "$(DESTDIR)$(bindir)/$(BIN)"
+	rm -f "$(DESTDIR)$(man1dir)/$(BIN).1"
+
+# Copy the three de-claude git hooks into .git/hooks (and enable nothing else).
+install-hooks:
+	$(INSTALL) -d .git/hooks
+	for h in $(HOOKS); do \
+		$(INSTALL) -m 0755 $(HOOKS_DIR)/$$h .git/hooks/$$h; \
+	done
+
+clean:
+	-$(GPRBUILD) -P $(PROJECT) clean
+	rm -rf obj
+
+distclean: clean
+	rm -f Makefile config.log config.status config.cache
+	rm -rf autom4te.cache
+
+dist: distclean
+	git archive --prefix=$(PACKAGE)-$(VERSION)/ -o $(PACKAGE)-$(VERSION).tar.gz HEAD \
+		|| tar --exclude=.git --exclude=obj --exclude=$(BIN) \
+			-czf $(PACKAGE)-$(VERSION).tar.gz \
+			--transform 's,^,$(PACKAGE)-$(VERSION)/,' .
+
+.PHONY: all check install uninstall install-hooks clean distclean dist

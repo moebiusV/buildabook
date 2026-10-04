@@ -1,0 +1,80 @@
+buildabook: a book builder driven by a plain-text outline
+===========================================================
+
+buildabook turns a plain-text outline into a typeset book. One outline file
+drives the chapter numbering, the table of contents, and every cross-reference,
+so a book is a build artifact of a single source of order.
+
+The program reads `outline.txt` (the one source of sequence and numbering),
+resolves `{{token}}` cross-references inside the chapter source files, and
+emits a Typst `book.typ` plus a `number_map.csv` audit. It grew out of three
+book projects that had each accumulated a near-identical copy of the same
+build script; this is that script, factored out and written in Ada.
+
+The input language
+------------------
+
+Each non-comment line of `outline.txt` is either an entry or a directive.
+
+    c:00001  The Hierarchy of Being     a content entry (prefix, UUID, title)
+    c:label:Warrant|Wt                  a directive (prefix, name, value)
+    k:00003.1  Stack 2.1: Mathematics   a sub-entry under the nearest chapter
+
+Prefixes are `c` (chapter), `p` (part), `a` (appendix), `d` (division),
+`n` (unnumbered), `s` (section), and `k` (sub-entry). A UUID is opaque
+identity, never renumbered; numbering comes from row position. Directives set
+state for the entries of their prefix that follow them, and that state is
+snapshotted onto each entry, so a cross-reference always renders with the
+regime in force at the target's position. Comments begin with `#`.
+
+The full specification is `LANGUAGE.md`.
+
+Building
+--------
+
+buildabook is Ada 2022, built with gprbuild, and links the hbnf runtime
+(`hbnf_config.gpr`, which pulls in mustache-ada transitively). The canonical
+toolchain is the ada-on-alpine overlay, packaged as the `ada-toolchain:edge`
+container image.
+
+    ./configure
+    make
+    make check        # the aunit suite
+    make install      # installs buildabook and its man page
+
+`configure` checks for gprbuild, the GNAT compiler, and that the hbnf and
+mustache-ada projects are gprbuild-visible. `build.sh` wraps the whole build in
+the container if you prefer that to a host toolchain.
+
+Usage
+-----
+
+    buildabook render        outline -> rendered/book.typ + number_map.csv
+    buildabook check         validate outline, filemap, and tokens; emit nothing
+    buildabook number-map    write number_map.csv only
+    buildabook spine <pdf>   rewrite the cover spine width from a page count
+    buildabook build         render, then compile the PDF with Typst
+
+The template
+------------
+
+The engine ships a default Typst template (`template/book.typ`). A book may
+override it. The coupling contract an override must honour is documented in
+`LANGUAGE.md`: define `book-title`, `running-title`, `fm-pages`, `body-pages`,
+`chapter(path, token, part, toc)`, `pgan(id)`, `pageof(id)`, and import cmarker.
+
+Repository hooks
+----------------
+
+The three de-claude git hooks in `githooks/` strip and block commits that credit
+or mention Claude or Anthropic. Enable them in a clone with:
+
+    make install-hooks        # or: git config core.hooksPath githooks
+
+Copying
+-------
+
+ISC. See `COPYING`. The authors are in `AUTHORS`; changes are summarised in
+`NEWS`.
+
+    https://github.com/moebiusV/buildabook

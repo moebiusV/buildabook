@@ -1,0 +1,132 @@
+.TH BUILDABOOK 1 "October 2026" "buildabook 0.1.0" "User Commands"
+.
+.SH NAME
+buildabook \- build a typeset book from a plain-text outline
+.
+.SH SYNOPSIS
+.B buildabook
+.I subcommand
+.RI [ options ]
+.br
+.B buildabook spine
+.I file.pdf
+.
+.SH DESCRIPTION
+.B buildabook
+turns a plain-text outline into a typeset book.  One outline file drives the
+chapter numbering, the table of contents, and every cross-reference, so the
+book is a build artifact of a single source of order.
+.PP
+The program reads
+.IR outline.txt ,
+the one source of sequence and numbering, resolves
+.B {{token}}
+cross-references in the chapter source files, and writes a Typst
+.I book.typ
+together with a
+.I number_map.csv
+audit.  It is the build script shared by several book projects, extracted and
+written in Ada.
+.
+.SH SUBCOMMANDS
+.TP
+.B render
+Read the outline, resolve tokens, and emit the rendered Typst book and the
+number map.  This is the default operation.
+.TP
+.B check
+Validate the outline, the file map, and every token reference.  Emit nothing;
+exit nonzero on the first error.
+.TP
+.B number-map
+Write
+.I number_map.csv
+only.
+.TP
+.B spine \fIfile.pdf\fR
+Rewrite the cover spine width from the page count of
+.IR file.pdf ,
+updating the
+.B #let sw
+binding in the cover template.
+.TP
+.B build
+Convenience wrapper: render, compile the PDF with Typst, then run
+.BR spine .
+.
+.SH OPTIONS
+.TP
+.BI \-\-outline " file"
+Outline file to read (default
+.IR outline.txt ).
+.TP
+.BI \-\-src " dir"
+Directory holding the chapter source files (default
+.IR chapters ).
+.TP
+.BI \-\-out " dir"
+Directory for the rendered output (default
+.IR rendered ).
+.TP
+.BI \-\-number-map " file"
+Where to write the CSV audit (default
+.IR number_map.csv ).
+.TP
+.B \-\-ignore-unmatched
+Do not fail when a source file's heading matches no outline token.
+.TP
+.BI \-\-max-table-rows " n"
+Split tables longer than
+.I n
+rows (0 disables).
+.
+.SH FILES
+.TP
+.I outline.txt
+The outline: one entry or directive per line, with
+.B #
+comments.  See
+.BR LANGUAGE.md .
+.TP
+.I filemap.txt
+Optional
+.IR UUID:filename
+map.  When absent, each source file is matched by its first heading.
+.TP
+.I book.conf
+Book metadata (title, author, slug) in the OpenBSD-style configuration
+language, parsed by the hbnf runtime.
+.TP
+.I number_map.csv
+Generated audit of every UUID and its rendered designation.
+.
+.SH ENVIRONMENT
+.TP
+.B TYPST
+Path to the Typst compiler, used by
+.BR build .
+.
+.SH EXIT STATUS
+Zero on success; nonzero if the outline, file map, or a token reference is
+invalid, or if a subcommand is unknown.
+.
+.SH EXAMPLES
+.PP
+.nf
+buildabook check
+buildabook render --outline outline.txt --src chapters --out rendered
+buildabook spine book.pdf
+buildabook build
+.fi
+.
+.SH SEE ALSO
+.BR LANGUAGE.md ,
+.BR typst (1)
+.
+.SH AUTHORS
+David Walther.
+.
+.SH COPYING
+ISC.  See the
+.B COPYING
+file distributed with the source.

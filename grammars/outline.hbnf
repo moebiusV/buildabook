@@ -1,0 +1,55 @@
+; outline.hbnf — the book outline language, as an hbnf grammar.
+; One entry per line: content (c:00001  Title) or directive (c:label:Warrant|Wt).
+; A title or value runs greedy to end of line because title_char/value atoms
+; exclude LF, and LF itself is whitespace (skipped, as in obconf).  word/int/
+; str are re-declared as char rules to suppress the built-in jets.
+;
+;   content   = prefix ":" uuid [ title ]          c:00001  Title
+;   directive = prefix ":" name ":" value          c:label:Warrant|Wt
+;   name is a fixed keyword set; value is free text (word/int/|/title atoms).
+
+language Ada
+
+include "common.hbnf"
+
+whitespace ws
+
+; ── structure (the root is the FIRST rule) ─────────────────────────────
+; entries are self-delimiting: title/value run greedy to EOL, and LF is
+; whitespace (as in obconf), so blank and comment lines skip entirely.
+outline   = *( entry )
+entry     = content | directive
+content   = prefix COLON uuid [ title ]
+directive = prefix COLON tail
+tail      = name COLON value
+
+; ── the directive keyword set (render.py's DIRECTIVE_RE) ───────────────
+name      = "label" | "number" | "count" | "default" | "none"
+
+; ── custom tokens (declared before word/int/str so they win ties) ─────
+prefix     = 'c' | 'p' | 'a' | 'd' | 'n' | 's' | 'k'
+; a uuid is one token: digits, or digits.digits (the k-stack minor).  Flat
+; alternation so hbnf emits a single scanner, not a colliding [ PERIOD
+; 1*DIGIT ] sub-token pair.
+uuid       = 1*DIGIT PERIOD 1*DIGIT | 1*DIGIT
+title      = ( SP | HTAB ) *title_char
+title_char = %x01-09 | %x0B-10FFFF        ; any code point except LF/CR
+
+; ── a directive value: free text to end of line, zero or more atoms ────
+value      = *( word | uuid | PIPE | title )
+
+; ── core types (char rules, suppress the built-in jets) ───────────────
+; word is letter-led only: the outline has no digit-led barewords (IPs, dotted
+; runs) — those are uuids, and the digit-led branch would tie with uuid's
+; `1*DIGIT [ PERIOD 1*DIGIT ]` on "10001.1" and win on declaration order.
+word = word_start *wordchars
+wordchars     = ALPHA | DIGIT | "_" | "-" | "."
+word_start    = ALPHA | "_" | "-"
+int  = 1*DIGIT | "-" 1*DIGIT
+str  = DQUOTE *str_char DQUOTE
+str_char = %x5C %x00-10FFFF | %x00-21 | %x23-5B | %x5D-10FFFF
+
+; ── whitespace: SP/HTAB/LF/CR/comment are skipped between entries ──────
+ws           = SP | HTAB | CR | LF | comment
+comment      = "#" *comment_char
+comment_char = %x01-09 | %x0B-10FFFF

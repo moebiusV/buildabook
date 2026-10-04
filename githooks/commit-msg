@@ -1,0 +1,18 @@
+#!/bin/sh
+# commit-msg — drop Claude/AI references from the commit message before it is
+# written.  Installed as .git/hooks/commit-msg; $1 is the path to the message
+# file, and edits to it are honoured by git.
+
+msg="$1"
+[ -f "$msg" ] || exit 0
+
+# Drop any line that mentions Claude or Anthropic: the Co-Authored-By trailers,
+# `Claude-Session:` URLs, "Claude Code", and any prose.  Never leaves the
+# message empty.
+grep -viE 'claude|anthropic' "$msg" > "$msg.clean" || true
+
+if [ -s "$msg.clean" ]; then
+    cat "$msg.clean" > "$msg"
+fi
+rm -f "$msg.clean"
+exit 0
