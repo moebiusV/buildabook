@@ -25,8 +25,18 @@ cross-references in the chapter source files, and writes a Typst
 .I book.typ
 together with a
 .I number_map.csv
-audit.  It is the build script shared by several book projects, extracted and
-written in Ada.
+audit.
+.PP
+The point of the tool is that a writer, human or LLM, never writes a number or
+a page reference by hand.  The prose holds stable tokens such as
+.BR {{c:00042}} ;
+buildabook computes the number at build time from the outline's row order, and
+page references resolve through native Typst lookups.  Inserting, deleting, or
+reordering a chapter is one line in the outline; every reference follows on
+the next build.  The
+.B check
+subcommand catches the mistakes a prose pass cannot hold in its head, such as
+duplicate UUIDs, unmatched files, and unresolvable tokens.
 .
 .SH SUBCOMMANDS
 .TP
@@ -99,6 +109,20 @@ language, parsed by the hbnf runtime.
 .TP
 .I number_map.csv
 Generated audit of every UUID and its rendered designation.
+.
+.SH LIMITATIONS
+.PP
+A title or directive value runs to end of line, so it cannot contain a literal
+newline, and there is no trailing-comment syntax.  Each entry is addressed by a
+five-digit UUID, so a writer must look up a UUID rather than a number; the
+number map is the look-up aid.  A page reference to a section requires that
+section's heading to carry its token.  A
+.B k:
+sub-entry binds to the chapter whose UUID is its
+.B NNNNN
+part, which the engine does not verify at parse time.  The book is emitted as
+one Typst document; splitting a book across volumes is a Makefile-level
+concern, not an engine feature.
 .
 .SH ENVIRONMENT
 .TP

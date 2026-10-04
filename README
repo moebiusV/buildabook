@@ -1,33 +1,70 @@
-buildabook: a book builder driven by a plain-text outline
-===========================================================
+buildabook
+==========
 
 buildabook turns a plain-text outline into a typeset book. One outline file
-drives the chapter numbering, the table of contents, and every cross-reference,
-so a book is a build artifact of a single source of order.
+drives the chapter numbering, the table of contents, and every
+cross-reference, so the book is a build artifact of a single source of order.
 
-The program reads `outline.txt` (the one source of sequence and numbering),
-resolves `{{token}}` cross-references inside the chapter source files, and
-emits a Typst `book.typ` plus a `number_map.csv` audit. It grew out of three
-book projects that had each accumulated a near-identical copy of the same
-build script; this is that script, factored out and written in Ada.
+buildabook is a build tool for long manuscripts, written in Ada. It reads
+`outline.txt`, resolves `{{token}}` cross-references inside the chapter source
+files, and emits a Typst `book.typ` plus a `number_map.csv` audit. It is the
+shared build script of three book projects, extracted into one program.
 
-The input language
-------------------
+Why it exists
+-------------
 
-Each non-comment line of `outline.txt` is either an entry or a directive.
+A long manuscript has a property that a single prose pass does not: every
+number and every cross-reference is a claim about the whole book, and those
+claims go stale the moment the structure changes. An LLM is good at prose and
+bad at that bookkeeping. It writes "see Chapter 14" and, ten chapters later,
+inserts a chapter so that 14 becomes 15 without noticing the reference.
 
-    c:00001  The Hierarchy of Being     a content entry (prefix, UUID, title)
-    c:label:Warrant|Wt                  a directive (prefix, name, value)
-    k:00003.1  Stack 2.1: Mathematics   a sub-entry under the nearest chapter
+buildabook removes that failure mode by separating identity from rendering.
+The writer, human or LLM, never writes a number. It writes a stable reference,
+`{{c:00042}}`, and the number is computed at build time from the row order of
+`outline.txt`. Inserting, deleting, or reordering a chapter is one line in the
+outline; every reference in the prose follows on the next build. A number is
+never baked into a title, so a renumber never rewrites prose.
 
-Prefixes are `c` (chapter), `p` (part), `a` (appendix), `d` (division),
-`n` (unnumbered), `s` (section), and `k` (sub-entry). A UUID is opaque
-identity, never renumbered; numbering comes from row position. Directives set
-state for the entries of their prefix that follow them, and that state is
-snapshotted onto each entry, so a cross-reference always renders with the
-regime in force at the target's position. Comments begin with `#`.
+The same mechanism covers the other places an LLM invents instead of computes:
 
-The full specification is `LANGUAGE.md`.
+* Page numbers are never written by hand. `{{page:90001}}` resolves through a
+  native Typst lookup, so a reference stays correct across repagination.
+* The table of contents is generated from the outline, never typed.
+* A token's prefix is checked against the target's kind, so a wrong prefix or
+  a typo'd UUID fails the build instead of shipping a wrong reference.
+* `buildabook check` fails on duplicate UUIDs, unmatched files, and
+  unresolvable tokens before any PDF is produced.
+
+The division of labour is deliberate. The LLM writes prose and stubs in the
+outline and chapter files; buildabook does the numbering, the references, and
+the consistency checks, which are the parts a prose pass cannot hold in its
+head.
+
+What it does
+------------
+
+* **Numbering from order.** Chapters, parts, appendices, sections, and
+  sub-entries are numbered from their row position in `outline.txt`, never
+  from their UUID digits.
+* **Directives.** `label`, `number`, `count`, `default`, and `none` change the
+  rendering regime for the entries of a prefix that follow them. The regime is
+  snapshotted onto each entry, so a cross-reference renders with the regime in
+  force at the target's position.
+* **Cross-references.** `{{c:00042}}`, `{{c:00042|n}}`, `{{c:00042|s}}`,
+  `{{cc:00001,00002}}`, `{{toc}}`, and the `s:`/`k:` forms resolve at build
+  time.
+* **Page references.** `{{page:ID}}`, `{{c:00042|page}}`, and `{{anchor:ID}}`
+  compile to native Typst `locate()` lookups, one pass, always exact.
+* **Number map.** `number_map.csv` lists every entry's UUID, kind, title,
+  regime, computed number, and rendered designation, for auditing a regime
+  change before compiling.
+* **No giant tables.** Markdown tables longer than a page are split with the
+  header row repeated.
+* **Cover spine.** `buildabook spine` rewrites the spine width in `cover.typ`
+  from the PDF page count.
+
+The input language is specified in `LANGUAGE.md`.
 
 Building
 --------
@@ -55,13 +92,54 @@ Usage
     buildabook spine <pdf>   rewrite the cover spine width from a page count
     buildabook build         render, then compile the PDF with Typst
 
+How it works
+------------
+
+The pipeline is one source, one document, one pass:
+
+    chapters/*.md + outline.txt + filemap.txt
+          |
+    buildabook render   parse the outline, number it, resolve every {{token}},
+          |             split oversized tables, and emit rendered/book.typ
+    typst compile rendered/book.typ   ->   the PDF
+
+The engine parses `outline.txt` with an hbnf-generated parser, applies the
+directives in one positional pass, and snapshots the regime onto each entry.
+It then builds a token map (`c:00042 -> "Chapter 42"`, and so on) and rewrites
+each chapter source, substituting tokens and planting page markers. The
+resulting Typst document imports a template and calls `#chapter(...)` once per
+entry.
+
 The template
 ------------
 
 The engine ships a default Typst template (`template/book.typ`). A book may
 override it. The coupling contract an override must honour is documented in
 `LANGUAGE.md`: define `book-title`, `running-title`, `fm-pages`, `body-pages`,
-`chapter(path, token, part, toc)`, `pgan(id)`, `pageof(id)`, and import cmarker.
+`chapter(path, token, part, toc)`, `pgan(id)`, `pageof(id)`, and import
+cmarker.
+
+Limitations
+-----------
+
+* **Line-oriented.** A title or directive value runs to end of line, so it
+  cannot contain a literal newline. There is no trailing-comment syntax.
+* **Five-digit UUIDs.** Each entry is addressed by a five-digit UUID (or
+  `NNNNN.MINOR` for a sub-entry). That is a finite namespace, and the writer
+  must look up a UUID rather than a number when writing a reference. The
+  `number_map.csv` is the look-up aid.
+* **Sections need their token for page refs.** A `{{page:...}}` reference to a
+  section requires that section's heading to carry its token
+  (`## {{ s:02104 }} — Title`), because that token is what plants the page
+  marker.
+* **Sub-entries assume their parent.** A `k:NNNNN.MINOR` entry binds to the
+  chapter with UUID `NNNNN`; the engine does not verify that chapter exists at
+  parse time.
+* **Monolithic output.** The book is one Typst document. Volume II or a
+  split-book workflow is a Makefile-level concern, not an engine feature.
+* **Toolchain weight.** Ada, gprbuild, hbnf, and Typst are more to install
+  than a Python script. In exchange the numbering and reference machinery is
+  checked at compile time and the output is reproducible.
 
 Repository hooks
 ----------------
