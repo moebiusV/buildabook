@@ -21,14 +21,17 @@ inserts a chapter so that 14 becomes 15 without noticing the reference.
 
 buildabook removes that failure mode by separating identity from rendering.
 The writer, human or LLM, never writes a number. It writes a stable reference,
-`{{c:00042}}`, and the number is computed at build time from the row order of
-`outline.txt`. Inserting, deleting, or reordering a chapter is one line in the
-outline; every reference in the prose follows on the next build. A number is
-never baked into a title, so a renumber never rewrites prose.
+`{{c:id00042}}`, and the number is computed at build time from the row order of
+`outline.txt`. The UUID (`id00042`) is a name, not a number: its digits are not
+the chapter's number, and a chapter named `c:id00042` can render as "Chapter 1"
+if it sits first in the outline. Inserting, deleting, or reordering a chapter
+is one line in the outline; every reference in the prose follows on the next
+build. A number is never baked into a title, so a renumber never rewrites
+prose.
 
 The same mechanism covers the other places an LLM invents instead of computes:
 
-* Page numbers are never written by hand. `{{page:90001}}` resolves through a
+* Page numbers are never written by hand. `{{page:id90001}}` resolves through a
   native Typst lookup, so a reference stays correct across repagination.
 * The table of contents is generated from the outline, never typed.
 * A token's prefix is checked against the target's kind, so a wrong prefix or
@@ -51,10 +54,10 @@ What it does
   rendering regime for the entries of a prefix that follow them. The regime is
   snapshotted onto each entry, so a cross-reference renders with the regime in
   force at the target's position.
-* **Cross-references.** `{{c:00042}}`, `{{c:00042|n}}`, `{{c:00042|s}}`,
-  `{{cc:00001,00002}}`, `{{toc}}`, and the `s:`/`k:` forms resolve at build
+* **Cross-references.** `{{c:id00042}}`, `{{c:id00042|n}}`, `{{c:id00042|s}}`,
+  `{{cc:id00001,00002}}`, `{{toc}}`, and the `s:`/`k:` forms resolve at build
   time.
-* **Page references.** `{{page:ID}}`, `{{c:00042|page}}`, and `{{anchor:ID}}`
+* **Page references.** `{{page:ID}}`, `{{c:id00042|page}}`, and `{{anchor:ID}}`
   compile to native Typst `locate()` lookups, one pass, always exact.
 * **Number map.** `number_map.csv` lists every entry's UUID, kind, title,
   regime, computed number, and rendered designation, for auditing a regime
@@ -105,7 +108,7 @@ The pipeline is one source, one document, one pass:
 
 The engine parses `outline.txt` with an hbnf-generated parser, applies the
 directives in one positional pass, and snapshots the regime onto each entry.
-It then builds a token map (`c:00042 -> "Chapter 42"`, and so on) and rewrites
+It then builds a token map (`c:id00042 -> "Chapter 42"`, and so on) and rewrites
 each chapter source, substituting tokens and planting page markers. The
 resulting Typst document imports a template and calls `#chapter(...)` once per
 entry.
@@ -125,15 +128,15 @@ Limitations
 * **Line-oriented.** A title or directive value runs to end of line, so it
   cannot contain a literal newline. There is no trailing-comment syntax.
 * **Five-digit UUIDs.** Each entry is addressed by a five-digit UUID (or
-  `NNNNN.MINOR` for a sub-entry). That is a finite namespace, and the writer
+  `idNNNNN.MINOR` for a sub-entry). That is a finite namespace, and the writer
   must look up a UUID rather than a number when writing a reference. The
   `number_map.csv` is the look-up aid.
 * **Sections need their token for page refs.** A `{{page:...}}` reference to a
   section requires that section's heading to carry its token
-  (`## {{ s:02104 }} — Title`), because that token is what plants the page
+  (`## {{ s:id02104 }} — Title`), because that token is what plants the page
   marker.
-* **Sub-entries assume their parent.** A `k:NNNNN.MINOR` entry binds to the
-  chapter with UUID `NNNNN`; the engine does not verify that chapter exists at
+* **Sub-entries assume their parent.** A `k:idNNNNN.MINOR` entry binds to the
+  chapter with UUID `idNNNNN`; the engine does not verify that chapter exists at
   parse time.
 * **Monolithic output.** The book is one Typst document. Volume II or a
   split-book workflow is a Makefile-level concern, not an engine feature.

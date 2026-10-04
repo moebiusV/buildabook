@@ -14,7 +14,8 @@ package Outline_Grammar is
    -- ── custom tokens (declared before word/int/str so they win ties) ─────
    subtype Prefix_Type is Unbounded_String;
 
-   -- a uuid is one token: digits, or digits.digits (the k-stack minor).  Flat
+   -- a uuid is one token: "uniq" + digits, or "uniq" + digits.digits (the k-stack
+   -- minor).  The "uniq" prefix marks it as a name, not a number.  Flat
    -- alternation so hbnf emits a single scanner, not a colliding [ PERIOD
    -- 1*DIGIT ] sub-token pair.
    subtype Uuid_Type is Unbounded_String;
@@ -33,6 +34,8 @@ package Outline_Grammar is
    subtype Wordchars_Type is Unbounded_String;
 
    subtype Word_start_Type is Unbounded_String;
+
+   subtype Int_Type is Unbounded_String;
 
    -- ── whitespace: SP/HTAB/LF/CR/comment are skipped between entries ──────
    subtype Ws_Type is Unbounded_String;
@@ -92,6 +95,7 @@ package Outline_Grammar is
    type Value_Entry is record
       Word : Unbounded_String;
       Uuid : Uuid_Type;
+      Int : Long_Long_Integer;
       PIPE : PIPE_Type;
       Title : Title_Type;
    end record;

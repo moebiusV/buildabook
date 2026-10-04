@@ -331,6 +331,11 @@ package body Outline is
             Append (B, E.PIPE);
          elsif Length (E.Title) > 0 then
             Append (B, E.Title);
+         else
+            --  the int atom (a bare count value): all the string fields are
+            --  empty, so the only field set is the integer.
+            Append (B, Ada.Strings.Fixed.Trim
+              (Long_Long_Integer'Image (E.Int), Ada.Strings.Left));
          end if;
       end loop;
       return B;

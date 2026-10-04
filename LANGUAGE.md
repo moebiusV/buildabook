@@ -6,6 +6,16 @@ define the document structure; their order in the file is the order of the
 book. Directives set rendering state that applies to subsequent content
 entries of the same prefix.
 
+**First, the UUID.** Every entry carries a UUID, written `idNNNNN` (five
+digits) or `idNNNNN.MINOR` for a sub-entry. The UUID is a name, not a number:
+its digits carry no order and no count. `c:id00042` does not mean "chapter 42";
+it means "the chapter named `id00042`". The number a chapter renders with
+(Chapter 1, Chapter 2, and so on) is computed from the entry's position in
+this file and has nothing to do with its UUID. A chapter named `c:id00042` can
+render as "Chapter 1" if it sits first in the outline. When you write a
+cross-reference, write the UUID (`{{c:id00042}}`); the number is filled in at
+build time.
+
 **Design intent.** UUIDs are pure identity: they are never renumbered, and
 nothing may be inferred from their digits. All numbering (Chapter 3,
 Warrant 42, Title I, Appendix B, §2) is computed from row position at build
@@ -51,7 +61,7 @@ The prefix is a single letter determining the structural kind:
 | `s` | section | "§N" | — | `arabic` |
 | `k` | sub-entry | "§N.M" | — | — |
 
-**UUID.** Five digits (or `NNNNN.MINOR` for a sub-entry). Unique across the
+**UUID.** Five digits (or `idNNNNN.MINOR` for a sub-entry). Unique across the
 outline. A UUID is opaque identity: its digits are immaterial to rendering.
 
 **Title.** Display text. Do not bake the computed designation into the title
@@ -64,8 +74,8 @@ typically inline headings within the parent's source file, not files of their
 own.
 
 **Sub-entries** (`k`) are the nearest chapter's sub-structure, rendered `§N.M`
-where `N` is the chapter number and `M` the minor. The `NNNNN.MINOR` UUID
-binds them to their parent chapter by the `NNNNN` part.
+where `N` is the chapter number and `M` the minor. The `idNNNNN.MINOR` UUID
+binds them to their parent chapter by the `idNNNNN` part.
 
 **Divisions** (`d`) are unnumbered structural markers (prologue, coda, end
 papers). They appear in the TOC but render without label or number. A
@@ -151,19 +161,19 @@ it is almost always a mistake). The suppression forms are `c:none:label` or
 
 Source files use `{{token}}` for cross-references, resolved at build time. A
 reference renders using the regime in force at the target's position in the
-outline, so `{{c:00042}}` renders "Chapter 42" if UUID 00042 sits in a
+outline, so `{{c:id00042}}` renders "Chapter 42" if UUID id00042 sits in a
 `Chapter` regime and "Warrant 42" if it sits after `c:label:Warrant`.
 
 ```
-{{c:00042}}           → "Chapter 42" / "Warrant 42" (regime at target)
-{{c:00042|n}}         → "42" (number only)
-{{c:00042|s}}         → "Ch 42" / "Wt 42" (short label at target)
-{{p:00100}}           → "Part I" / "Title I"
-{{a:00200}}           → "Appendix A"
-{{s:00300}}           → "§3"
-{{cc:00001,00002}}    → "Chapters 1 and 2" / "Warrants 1 and 2"
+{{c:id00042}}           → "Chapter 42" / "Warrant 42" (regime at target)
+{{c:id00042|n}}         → "42" (number only)
+{{c:id00042|s}}         → "Ch 42" / "Wt 42" (short label at target)
+{{p:id00100}}           → "Part I" / "Title I"
+{{a:id00200}}           → "Appendix A"
+{{s:id00300}}           → "§3"
+{{cc:id00001,00002}}    → "Chapters 1 and 2" / "Warrants 1 and 2"
 {{cc:...|sort}}       → same, sorted by number
-{{d:02000}}           → the division's title
+{{d:id02000}}           → the division's title
 {{toc}}               → the generated Table of Contents
 ```
 
@@ -177,10 +187,10 @@ back to their title.
 Page numbers are never written by hand:
 
 ```
-{{c:10042|page}}      → the page where that entry begins
-{{page:10042}}        → same, addressed by bare UUID
-{{anchor:90001}}      → an invisible anchor at this spot in the prose
-{{page:90001}}        → the page that anchor landed on
+{{c:id10042|page}}      → the page where that entry begins
+{{page:id10042}}        → same, addressed by bare UUID
+{{anchor:id90001}}      → an invisible anchor at this spot in the prose
+{{page:id90001}}        → the page that anchor landed on
 ```
 
 Page refs compile to native Typst `locate()` lookups: one document, one pass,
@@ -191,7 +201,7 @@ always exact.
 ## Errors and the file map
 
 buildabook maps outline entries to source files by reading each `.md` file's
-first `# ` heading and matching the full token (`c:00001`) against it. The
+first `# ` heading and matching the full token (`c:id00001`) against it. The
 build fails before writing anything if a source file's heading matches no
 outline token, if a heading matches two tokens, if two files claim one token,
 or if the outline is malformed (duplicate UUID, unknown prefix, unknown
@@ -225,26 +235,26 @@ metadata bindings and the `#chapter(...)` calls.
 # ── Frame: unlabeled parts; plain "Chapter N" chapters ──
 p:none:label
 p:none:number
-p:00100    The Frame of Things
-c:01001    The Hierarchy of Being
-c:01002    Israel Among the Nations
-d:03000    Prologue of Primal Warrants
+p:id00100    The Frame of Things
+c:id01001    The Hierarchy of Being
+c:id01002    Israel Among the Nations
+d:id03000    Prologue of Primal Warrants
 
 # ── The ten books: Title I..X, Warrant 1..120 ──
 p:label:Title
 p:number:roman
 p:count:1
-p:04000    God & The Celestial Hierarchy
+p:id04000    God & The Celestial Hierarchy
 c:label:Warrant|Wt
 c:count:1
-c:10001    Angelic Governance and Guidance
-c:10002    Divine Judgment Executed by Celestial Beings
-k:10001.1  Stack 2.1: Mathematics
+c:id10001    Angelic Governance and Guidance
+c:id10002    Divine Judgment Executed by Celestial Beings
+k:id10001.1  Stack 2.1: Mathematics
 ```
 
 Inserting a new warrant between the first two is one line with a fresh UUID;
 on the next build it renders as Warrant 2, the next becomes Warrant 3, and
-every `{{c:10002}}` in the prose follows automatically.
+every `{{c:id10002}}` in the prose follows automatically.
 
 ---
 

@@ -238,6 +238,17 @@ package body Outline_Grammar.Parser is
                declare
                   El : Value_Entry;
                begin
+                  Expect_Kind (P, Int, "a number");
+                  El.Int := Long_Long_Integer'Value (To_String (P.Toks (P.Pos).Text)); P.Pos := P.Pos + 1;
+                  E := El; Matched := True;
+               exception
+                  when Parse_Error => P.Pos := Save;
+               end;
+            end if;
+            if not Matched then
+               declare
+                  El : Value_Entry;
+               begin
                   Expect_Kind (P, PIPE, "PIPE");
                   El.PIPE := P.Toks (P.Pos).Text; P.Pos := P.Pos + 1;
                   E := El; Matched := True;
@@ -417,6 +428,16 @@ package body Outline_Grammar.Parser is
       Off := 0;
       Ok := True;
       if Ok then
+         N := Decode_Utf8 (S, Pos + Off, Len, Cp);
+         Ok := N > 0 and then (Cp >= 105 and then Cp <= 105);
+         if Ok then Off := Off + N; end if;
+      end if;
+      if Ok then
+         N := Decode_Utf8 (S, Pos + Off, Len, Cp);
+         Ok := N > 0 and then (Cp >= 100 and then Cp <= 100);
+         if Ok then Off := Off + N; end if;
+      end if;
+      if Ok then
          declare
             Cnt : Natural := 0;
          begin
@@ -476,6 +497,16 @@ package body Outline_Grammar.Parser is
       if Ok and then Off > Best then Best := Off; end if;
       Off := 0;
       Ok := True;
+      if Ok then
+         N := Decode_Utf8 (S, Pos + Off, Len, Cp);
+         Ok := N > 0 and then (Cp >= 105 and then Cp <= 105);
+         if Ok then Off := Off + N; end if;
+      end if;
+      if Ok then
+         N := Decode_Utf8 (S, Pos + Off, Len, Cp);
+         Ok := N > 0 and then (Cp >= 100 and then Cp <= 100);
+         if Ok then Off := Off + N; end if;
+      end if;
       if Ok then
          declare
             Cnt : Natural := 0;
@@ -900,6 +931,79 @@ package body Outline_Grammar.Parser is
       return Best;
    end Scan_Word;
 
+   function Scan_Int (S : String; Pos, Len : Natural) return Natural is
+      Cp   : Natural;
+      N    : Natural;
+      Best : Natural := 0;
+      Off  : Natural;
+      Ok   : Boolean;
+   begin
+      Off := 0;
+      Ok := True;
+      if Ok then
+         declare
+            Cnt : Natural := 0;
+         begin
+            loop
+               declare
+                  Br    : Natural := 0;
+                  O     : Natural;
+                  Match : Boolean;
+               begin
+                  O := 0;
+                  Match := True;
+                  if Match then
+                     N := Decode_Utf8 (S, Pos + Off + O, Len, Cp);
+                     Match := N > 0 and then (Cp >= 48 and then Cp <= 57);
+                     if Match then O := O + N; end if;
+                  end if;
+                  if Match and then O > Br then Br := O; end if;
+                  exit when Br = 0;
+                  Off := Off + Br;
+                  Cnt := Cnt + 1;
+               end;
+            end loop;
+            if Cnt < 1 then Ok := False; end if;
+         end;
+      end if;
+      if Ok and then Off > Best then Best := Off; end if;
+      Off := 0;
+      Ok := True;
+      if Ok then
+         N := Decode_Utf8 (S, Pos + Off, Len, Cp);
+         Ok := N > 0 and then (Cp >= 45 and then Cp <= 45);
+         if Ok then Off := Off + N; end if;
+      end if;
+      if Ok then
+         declare
+            Cnt : Natural := 0;
+         begin
+            loop
+               declare
+                  Br    : Natural := 0;
+                  O     : Natural;
+                  Match : Boolean;
+               begin
+                  O := 0;
+                  Match := True;
+                  if Match then
+                     N := Decode_Utf8 (S, Pos + Off + O, Len, Cp);
+                     Match := N > 0 and then (Cp >= 48 and then Cp <= 57);
+                     if Match then O := O + N; end if;
+                  end if;
+                  if Match and then O > Br then Br := O; end if;
+                  exit when Br = 0;
+                  Off := Off + Br;
+                  Cnt := Cnt + 1;
+               end;
+            end loop;
+            if Cnt < 1 then Ok := False; end if;
+         end;
+      end if;
+      if Ok and then Off > Best then Best := Off; end if;
+      return Best;
+   end Scan_Int;
+
    function Scan_COLON (S : String; Pos, Len : Natural) return Natural is
       Cp  : Natural;
       N   : Natural;
@@ -931,6 +1035,7 @@ package body Outline_Grammar.Parser is
       N := Scan_Uuid (S, Pos, Len); if N > Best then Best := N; Kind := Uuid; end if;
       N := Scan_Title (S, Pos, Len); if N > Best then Best := N; Kind := Title; end if;
       N := Scan_Word (S, Pos, Len); if N > Best then Best := N; Kind := Atom; end if;
+      N := Scan_Int (S, Pos, Len); if N > Best then Best := N; Kind := Int; end if;
       N := Scan_COLON (S, Pos, Len); if N > Best then Best := N; Kind := COLON; end if;
       N := Scan_PIPE (S, Pos, Len); if N > Best then Best := N; Kind := PIPE; end if;
       return Best;
