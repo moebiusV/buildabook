@@ -64,5 +64,6 @@ package Outline is
    --  number-only and list forms.
    function Roman (N : Natural) return String;
    function Letter_Num (N : Natural) return String;
+   function Format_Number (Style : Number_Style; N : Natural) return String;
 
 end Outline;
