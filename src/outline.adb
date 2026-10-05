@@ -159,14 +159,15 @@ package body Outline is
          when 'p' => return Part;
          when 'a' => return Appendix;
          when 'd' => return Division;
-         when 'n' => return Unlisted;
+         when 'n' => return Front_Matter;
+         when 'u' => return Unlisted;
          when 's' => return Section;
          when 'k' => return Sub_Entry;
          when others => raise Outline_Error with "unknown prefix '" & Ch & "'";
       end case;
    end Kind_Of;
 
-   type Prefix_Id is (C_Id, P_Id, A_Id, D_Id, N_Id, S_Id, K_Id);
+   type Prefix_Id is (C_Id, P_Id, A_Id, D_Id, N_Id, U_Id, S_Id, K_Id);
 
    function Prefix_Id_Of (Ch : Character) return Prefix_Id is
    begin
@@ -176,6 +177,7 @@ package body Outline is
          when 'a' => return A_Id;
          when 'd' => return D_Id;
          when 'n' => return N_Id;
+         when 'u' => return U_Id;
          when 's' => return S_Id;
          when 'k' => return K_Id;
          when others => raise Outline_Error with "unknown prefix '" & Ch & "'";
@@ -210,7 +212,7 @@ package body Outline is
          when Part      => return Roman;
          when Appendix  => return Letter;
          when Section   => return Arabic;
-         when Division | Unlisted | Sub_Entry => return No_Number;
+         when Division | Front_Matter | Unlisted | Sub_Entry => return No_Number;
       end case;
    end Default_Number;
 
@@ -468,7 +470,7 @@ package body Outline is
                                  Current_Section := 0;
                               end if;
                            end;
-                        when Division | Unlisted =>
+                        when Division | Front_Matter | Unlisted =>
                            E.Label := Null_Unbounded_String;
                            E.Short := Null_Unbounded_String;
                            E.Style := No_Number;
@@ -481,7 +483,7 @@ package body Outline is
                            if Length (Current_Parent) = 0 then
                               raise Outline_Error with
                                 "section " & To_String (E.Token) &
-                                " appears before any chapter, division, or unlisted entry";
+                                " appears before any chapter, division, front-matter, or unlisted entry";
                            end if;
                            E.Parent := Current_Parent;
                            Current_Section := Current_Section + 1;
@@ -510,7 +512,7 @@ package body Outline is
       Short_Form : Boolean := False) return String is
    begin
       case E.K is
-         when Division | Unlisted =>
+         when Division | Front_Matter | Unlisted =>
             return To_String (E.Title);
          when Sub_Entry =>
             if Length (E.Title) > 0 then

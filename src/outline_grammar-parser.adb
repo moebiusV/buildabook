@@ -403,6 +403,14 @@ package body Outline_Grammar.Parser is
       Ok := True;
       if Ok then
          N := Decode_Utf8 (S, Pos + Off, Len, Cp);
+         Ok := N > 0 and then (Cp >= 117 and then Cp <= 117);
+         if Ok then Off := Off + N; end if;
+      end if;
+      if Ok and then Off > Best then Best := Off; end if;
+      Off := 0;
+      Ok := True;
+      if Ok then
+         N := Decode_Utf8 (S, Pos + Off, Len, Cp);
          Ok := N > 0 and then (Cp >= 115 and then Cp <= 115);
          if Ok then Off := Off + N; end if;
       end if;

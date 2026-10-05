@@ -14,7 +14,7 @@ package Outline is
 
    use Ada.Strings.Unbounded;
 
-   type Kind is (Chapter, Part, Appendix, Division, Unlisted, Section, Sub_Entry);
+   type Kind is (Chapter, Part, Appendix, Division, Front_Matter, Unlisted, Section, Sub_Entry);
 
    type Number_Style is (Arabic, Roman, Roman_Lower, Letter, No_Number);
 

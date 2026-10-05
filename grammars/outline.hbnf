@@ -27,7 +27,7 @@ tail      = name COLON value
 name      = "label" | "number" | "count" | "default" | "none"
 
 ; ── custom tokens (declared before word/int/str so they win ties) ─────
-prefix     = 'c' | 'p' | 'a' | 'd' | 'n' | 's' | 'k'
+prefix     = 'c' | 'p' | 'a' | 'd' | 'n' | 'u' | 's' | 'k'
 ; a uuid is one token: "uniq" + digits, or "uniq" + digits.digits (the k-stack
 ; minor).  The "uniq" prefix marks it as a name, not a number.  Flat
 ; alternation so hbnf emits a single scanner, not a colliding [ PERIOD

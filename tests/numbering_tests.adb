@@ -114,6 +114,32 @@ package body Numbering_Tests is
       Assert (Raised, "duplicate UUID should raise Outline_Error");
    end Test_Duplicate_Uuid;
 
+   procedure Test_Front_Matter (T : in out Test_Case'Class) is
+      pragma Unreferenced (T);
+      O : Outline.Outline_Type := Load_Outline
+        ("n:id02010  Compiler's Preface" & ASCII.LF &
+         "u:id09000  Unlisted Note" & ASCII.LF &
+         "d:id03000  Prologue" & ASCII.LF &
+         "c:id00001  First Chapter" & ASCII.LF);
+   begin
+      Assert (Natural (O.Rows.Length) = 4, "expected 4 outline rows");
+
+      Assert (O.Rows (1).K = Outline.Front_Matter, "n: is front matter");
+      Assert (O.Rows (1).Toc, "front matter is TOC-listed");
+      Assert (O.Rows (1).Style = Outline.No_Number,
+              "front matter is unnumbered");
+      Assert (Outline.Display (O.Rows (1)) = "Compiler's Preface",
+              "front matter renders as its title");
+
+      Assert (O.Rows (2).K = Outline.Unlisted, "u: is unlisted");
+      Assert (not O.Rows (2).Toc, "unlisted is omitted from the TOC");
+      Assert (Outline.Display (O.Rows (2)) = "Unlisted Note",
+              "unlisted renders as its title");
+
+      Assert (O.Rows (3).K = Outline.Division, "d: is a division");
+      Assert (O.Rows (3).Toc, "division is TOC-listed");
+   end Test_Front_Matter;
+
    function Name (T : Test) return Message_String is
       pragma Unreferenced (T);
    begin
@@ -126,6 +152,7 @@ package body Numbering_Tests is
       Registration.Register_Routine (T, Test_Sections'Access, "sections");
       Registration.Register_Routine (T, Test_Label_Directive'Access, "label + number directives");
       Registration.Register_Routine (T, Test_Duplicate_Uuid'Access, "duplicate UUID");
+      Registration.Register_Routine (T, Test_Front_Matter'Access, "front matter + unlisted");
    end Register_Tests;
 
    function Suite return Access_Test_Suite is

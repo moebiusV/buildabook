@@ -88,7 +88,7 @@ package body Tokens is
 
    function Toc_Text (E : Outline.Row) return String is
       Disp  : constant String :=
-        (if E.K in Outline.Division | Outline.Unlisted then ""
+        (if E.K in Outline.Division | Outline.Front_Matter | Outline.Unlisted then ""
          else Outline.Display (E));
       Title : constant String :=
         (if E.Suppress_Title then "" else To_String (E.Title));
@@ -287,7 +287,8 @@ package body Tokens is
       elsif Prefix = "p" then return Outline.Part;
       elsif Prefix = "a" then return Outline.Appendix;
       elsif Prefix = "d" then return Outline.Division;
-      elsif Prefix = "n" then return Outline.Unlisted;
+      elsif Prefix = "n" then return Outline.Front_Matter;
+      elsif Prefix = "u" then return Outline.Unlisted;
       elsif Prefix = "s" then return Outline.Section;
       else raise Tokens_Error with "Unknown token prefix: " & Prefix;
       end if;

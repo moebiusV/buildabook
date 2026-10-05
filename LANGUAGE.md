@@ -57,7 +57,8 @@ The prefix is a single letter determining the structural kind:
 | `p` | part | "Part III" | `Part` | `roman` |
 | `a` | appendix | "Appendix A" | `Appendix` | `letter` |
 | `d` | division | unnumbered | — | — |
-| `n` | unlisted | unnumbered | — | — |
+| `n` | front matter | unnumbered | — | — |
+| `u` | unlisted | unnumbered | — | — |
 | `s` | section | "§N" | — | `arabic` |
 | `k` | sub-entry | "§N.M" | — | — |
 
@@ -81,9 +82,12 @@ binds them to their parent chapter by the `idNNNNN` part.
 papers). They appear in the TOC but render without label or number. A
 cross-reference to a division renders its title.
 
-**Unlisted** (`n`) entries are identical to divisions except never listed in
-the TOC, for front matter, colophons, and other apparatus that should not
-announce itself.
+**Front matter** (`n`) entries are unnumbered, TOC-listed, and rendered with
+roman folios (`fm-pages`) before the body-page switch — prefaces, forewords,
+introductions. A cross-reference to a front-matter entry renders its title.
+
+**Unlisted** (`u`) entries are identical to divisions except never listed in
+the TOC, for apparatus that should not announce itself.
 
 ---
 
@@ -225,7 +229,11 @@ override it, but the engine requires this coupling contract of any template:
 * import cmarker
 
 The template owns front matter and TOC styling; the engine injects the
-metadata bindings and the `#chapter(...)` calls.
+metadata bindings and the `#chapter(...)` calls.  A template with front-matter
+(`n`) entries places a `// {{FRONT-MATTER}}` marker on its own line after the
+TOC and before the body-page switch (`#show: body-pages`); the engine replaces
+that marker with the front-matter chapter calls.  Templates without front
+matter simply omit the marker.
 
 ---
 

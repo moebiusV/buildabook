@@ -406,7 +406,7 @@ procedure Buildabook_Cli is
            Build.Next_Uuid (To_String (C.Outline), To_String (C.Src));
       begin
          if Prefix'Length = 1
-           and then Prefix (Prefix'First) in 'c' | 'p' | 'a' | 'd' | 'n' | 's' | 'k'
+           and then Prefix (Prefix'First) in 'c' | 'p' | 'a' | 'd' | 'n' | 'u' | 's' | 'k'
          then
             Put_Line (Prefix & ":" & Uuid);
          else
