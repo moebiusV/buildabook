@@ -266,8 +266,20 @@ package body Build is
       return Result;
    end Compute_Unmatched;
 
-   --  Register {{anchor:ID}} tokens so {{page:ID}} can validate against them.
-   procedure Register_Anchors (R : in out Tokens.Resolver; Text : String) is
+   --  True when S is a bare UUID: "id" followed by exactly five digits.
+   function Is_Id_Uuid (S : String) return Boolean is
+   begin
+      return S'Length = 7
+        and then S (S'First) = 'i'
+        and then S (S'First + 1) = 'd'
+        and then (for all K in S'First + 2 .. S'Last => S (K) in '0' .. '9');
+   end Is_Id_Uuid;
+
+   --  Register {{anchor:ID}} tokens so {{page:ID}} can validate against them,
+   --  matching render.py's register_anchors checks: a well-formed idNNNNN that
+   --  neither collides with an outline entry nor repeats another anchor.
+   procedure Register_Anchors
+     (R : in out Tokens.Resolver; Src_Path : String; Text : String) is
       P : Natural := Text'First;
    begin
       while P <= Text'Last loop
@@ -287,9 +299,27 @@ package body Build is
                      if B'Length >= 7
                        and then B (B'First .. B'First + 6) = "anchor:"
                      then
-                        R.Anchor_Ids.Insert
-                          (Ada.Strings.Fixed.Trim
-                             (B (B'First + 7 .. B'Last), Ada.Strings.Both));
+                        declare
+                           Aid : constant String :=
+                             Ada.Strings.Fixed.Trim
+                               (B (B'First + 7 .. B'Last), Ada.Strings.Both);
+                        begin
+                           if not Is_Id_Uuid (Aid) then
+                              raise Build_Error with
+                                Src_Path & ": bad anchor id '" & Aid &
+                                "' — expected idNNNNN";
+                           end if;
+                           if R.O.By_Uuid.Contains (Aid) then
+                              raise Build_Error with
+                                Src_Path & ": anchor id " & Aid &
+                                " collides with an outline entry";
+                           end if;
+                           if R.Anchor_Ids.Contains (Aid) then
+                              raise Build_Error with
+                                Src_Path & ": duplicate anchor id " & Aid;
+                           end if;
+                           R.Anchor_Ids.Insert (Aid);
+                        end;
                      end if;
                   end;
                   P := Q + 2;
@@ -355,7 +385,7 @@ package body Build is
                Path : constant String := Resolve_Path (Src_Dir, To_String (Fname));
             begin
                if Ada.Directories.Exists (Path) then
-                  Register_Anchors (R, Files.Read (Path));
+                  Register_Anchors (R, Path, Files.Read (Path));
                end if;
             end;
          end loop;
@@ -474,7 +504,7 @@ package body Build is
                Path : constant String := Resolve_Path (Src_Dir, To_String (Fname));
             begin
                if Ada.Directories.Exists (Path) then
-                  Register_Anchors (R, Files.Read (Path));
+                  Register_Anchors (R, Path, Files.Read (Path));
                end if;
             end;
          end loop;
