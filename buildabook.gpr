@@ -1,11 +1,11 @@
 --  buildabook.gpr — the outline-language book builder.
 --
 --  Reads a book's outline.txt + book.conf, resolves {{token}} cross-references,
---  and emits a Typst book.typ plus a number_map.csv audit.  Depends on hbnf
---  (hbnf_config.gpr), whose code templates are Mustache (mustache.gpr) — so
---  mustache is pulled in transitively, never linked directly here.
-
-with "hbnf_config";
+--  and emits a Typst book.typ plus a number_map.csv audit.  The outline is
+--  parsed by an hbnf-generated grammar (outline_grammar.*, checked in); the
+--  book.conf reader will pull in hbnf's HBNF_Config crate (with "hbnf_config"),
+--  whose code templates are Mustache — mustache is then pulled in
+--  transitively, never linked directly here.
 
 project Buildabook is
 
