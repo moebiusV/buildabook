@@ -75,6 +75,17 @@ already in use, in the outline and the source files, plus one).  An optional
 prefix prints it as
 .IR prefix :idNNNNN ,
 for a writer minting a fresh chapter, section, or anchor reference.
+.TP
+.BR readme
+Rebuild
+.I README.md
+from
+.I DESCRIPTION.md
+(the book title, tagline, creation date, and intro prose) and the per-chapter
+.I .md.desc
+sidecars (title, tagline, creation date, last-modified date).  A chapter whose
+.I .desc
+sidecar is missing is skipped and noted on standard error, never an error.
 .
 .SH OPTIONS
 A command-line flag overrides

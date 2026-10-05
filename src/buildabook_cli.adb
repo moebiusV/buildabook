@@ -19,6 +19,7 @@ with Ada.Text_IO;
 with Build;
 with Config;
 with Materialize;
+with Readme;
 with Shell;
 with Spine;
 
@@ -85,7 +86,7 @@ procedure Buildabook_Cli is
       return False;
    end Has_Flag;
 
-   type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_Uuid, S_All);
+   type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_Uuid, S_Readme, S_All);
 
    function Subcommand return Stage is
    begin
@@ -105,6 +106,8 @@ procedure Buildabook_Cli is
                return S_Number_Map;
             elsif A = "uuid" then
                return S_Uuid;
+            elsif A = "readme" then
+               return S_Readme;
             end if;
          end;
       end if;
@@ -193,7 +196,8 @@ procedure Buildabook_Cli is
       Put_Line ("  cover       update the cover spine and compile cover.typ");
       Put_Line ("  check       validate outline + filemap + tokens, emit nothing");
       Put_Line ("  number-map  write number_map.csv only");
-      Put_Line ("  uuid [c|p|a|d|n|s|k]  print the next free UUID (optionally prefixed)");
+      Put_Line ("  uuid [c|p|a|d|n|u|s|k]  print the next free UUID (optionally prefixed)");
+      Put_Line ("  readme      rebuild README.md from DESCRIPTION.md + .desc sidecars");
       New_Line;
       Put_Line ("Each stage reports what is missing and what it needs, and a");
       Put_Line ("missing or failing stage never blocks the others — no cover.typ");
@@ -211,6 +215,8 @@ procedure Buildabook_Cli is
       Put_Line ("  --pdf PATH          book PDF output (default <slug>.pdf)");
       Put_Line ("  --cover-src PATH    cover source (default cover.typ)");
       Put_Line ("  --cover PATH        cover PDF output (default <slug>-cover.pdf)");
+      Put_Line ("  --description PATH  book header for the readme (default DESCRIPTION.md)");
+      Put_Line ("  --readme PATH       readme output (default README.md)");
    end Usage;
 
    -- ── stages ───────────────────────────────────────────────────────────────
@@ -420,10 +426,33 @@ procedure Buildabook_Cli is
          Ok := False;
    end Run_Uuid;
 
+   procedure Run_Readme (C : Run_Config; Ok : out Boolean) is
+      Description : constant String :=
+        Argument_Value ("description", "DESCRIPTION.md");
+      Readme_Out : constant String :=
+        Argument_Value ("readme", "README.md");
+   begin
+      begin
+         Readme.Write_Readme
+           (Description, To_String (C.Src), To_String (C.Slug), Readme_Out);
+      exception
+         when E : Readme.Readme_Error =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+         when E : others =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+      end;
+      Msg ("wrote " & Readme_Out);
+      Ok := True;
+   end Run_Readme;
+
    -- ── main ────────────────────────────────────────────────────────────────
 
    Sub    : constant Stage := Subcommand;
-   Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok, Uuid_Ok : Boolean;
+   Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok, Uuid_Ok, Readme_Ok : Boolean;
 
 begin
    if Ada.Command_Line.Argument_Count >= 1
@@ -457,6 +486,9 @@ begin
          when S_Uuid =>
             Run_Uuid (C, Uuid_Ok);
             Ada.Command_Line.Set_Exit_Status (if Uuid_Ok then 0 else 1);
+         when S_Readme =>
+            Run_Readme (C, Readme_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Readme_Ok then 0 else 1);
          when S_All =>
             --  default: build what it can, in order, each stage guarded by the
             --  previous stage's output so a failure never cascades.

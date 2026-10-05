@@ -279,3 +279,25 @@ typst compile rendered/book.typ   →   the PDF
 One source, one document, one pass. `buildabook number-map` writes a CSV of
 every entry's UUID, kind, title, snapshotted regime, computed number, and
 rendered designation.
+
+---
+
+## README sidecars
+
+`buildabook readme` rebuilds `README.md` from two sources:
+
+* **`DESCRIPTION.md`** — the book header: `Title`, `Tagline`, and
+  `Creation-Date` front matter, then a blank line, then the intro prose.
+* **`<chapter>.md.desc`** — one per chapter source, `Key: value` lines:
+
+```
+Title: Chapter 1: Intelligence Needs Bodies
+Creation-Date: 2026-07-03
+Last-Modified: 2026-10-04
+Output-Formats:
+Tagline: A brain without a body is a brain without an error-correction mechanism.
+```
+
+The dates are self-contained; `git commit dates are authoritative` for the
+initial population.  A chapter whose `.desc` is missing is skipped and noted on
+standard error, never an error.
