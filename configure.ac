@@ -67,6 +67,16 @@ AS_IF([$GPRBUILD -P "$srcdir/buildabook.gpr" -q -c >/dev/null 2>&1],
       [AC_MSG_RESULT([no])
        AC_MSG_ERROR([hbnf_config.gpr (and its mustache.gpr dependency) must be visible to gprbuild; install the ada-on-alpine hbnf + mustache-ada packages])])
 
+# -- aunit (for `make check`) ------------------------------------------------
+# The test harness links aunit (tests/tests.gpr `with "aunit"`); it is needed
+# only for `make check`, not for the buildabook executable, so a missing aunit
+# is a warning, not an error.
+AC_MSG_CHECKING([that aunit.gpr is gprbuild-visible])
+AS_IF([$GPRBUILD -P "$srcdir/tests/tests.gpr" -q -c >/dev/null 2>&1],
+      [AC_MSG_RESULT([yes])],
+      [AC_MSG_RESULT([no])
+       AC_MSG_WARN([aunit.gpr not visible to gprbuild; `make check` will not run])])
+
 # -- install layout ---------------------------------------------------------
 # AC_PREFIX_DEFAULT then normalise the ac_default_prefix dance so Makefile.in
 # can use plain $(prefix)/$(bindir)/$(mandir).

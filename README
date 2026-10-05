@@ -83,8 +83,9 @@ container image.
     make install      # installs buildabook and its man page
 
 `configure` checks for gprbuild, the GNAT compiler, and that the hbnf and
-mustache-ada projects are gprbuild-visible. `build.sh` wraps the whole build in
-the container if you prefer that to a host toolchain.
+mustache-ada projects are gprbuild-visible (and that aunit is visible, for
+`make check`). `build.sh` wraps the whole build in the container if you prefer
+that to a host toolchain.
 
 Usage
 -----

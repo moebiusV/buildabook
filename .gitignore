@@ -4,6 +4,13 @@
 /*.ali
 /*.o
 
+# aunit test harness artifacts
+/tests/obj/
+/tests/tests
+/tests/*.ali
+/tests/*.o
+/tests/*.bexch
+
 # configure-generated (autoconf)
 /configure
 /Makefile
