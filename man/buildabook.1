@@ -5,11 +5,8 @@ buildabook \- build a typeset book from a plain-text outline
 .
 .SH SYNOPSIS
 .B buildabook
-.I subcommand
+.RI [ typst | pdf | cover | check | number-map ]
 .RI [ options ]
-.br
-.B buildabook spine
-.I file.pdf
 .
 .SH DESCRIPTION
 .B buildabook
@@ -29,7 +26,7 @@ audit.
 .PP
 The point of the tool is that a writer, human or LLM, never writes a number or
 a page reference by hand.  The prose holds stable tokens such as
-.BR {{c:00042}} ;
+.BR {{c:id00042}} ;
 buildabook computes the number at build time from the outline's row order, and
 page references resolve through native Typst lookups.  Inserting, deleting, or
 reordering a chapter is one line in the outline; every reference follows on
@@ -39,10 +36,28 @@ subcommand catches the mistakes a prose pass cannot hold in its head, such as
 duplicate UUIDs, unmatched files, and unresolvable tokens.
 .
 .SH SUBCOMMANDS
+With no subcommand,
+.B buildabook
+builds all three stages in order, building whatever it can: a missing or
+failing stage is reported and the next stage is still attempted when its own
+inputs are present.
 .TP
-.B render
-Read the outline, resolve tokens, and emit the rendered Typst book and the
-number map.  This is the default operation.
+.B typst
+Render the book: parse the outline, resolve tokens, and emit
+.IR rendered/book.typ
+plus
+.IR number_map.csv .
+.TP
+.B pdf
+Compile
+.IR rendered/book.typ
+to the book PDF with Typst.
+.TP
+.B cover
+Update the cover spine width from the book PDF's page count (via
+.BR pdfinfo (1)),
+then compile the cover with Typst.  Skipped with a warning when there is no
+cover source or no book PDF.
 .TP
 .B check
 Validate the outline, the file map, and every token reference.  Emit nothing;
@@ -52,22 +67,19 @@ exit nonzero on the first error.
 Write
 .I number_map.csv
 only.
-.TP
-.B spine \fIfile.pdf\fR
-Rewrite the cover spine width from the page count of
-.IR file.pdf ,
-updating the
-.B #let sw
-binding in the cover template.
-.TP
-.B build
-Convenience wrapper: render, compile the PDF with Typst, then run
-.BR spine .
 .
 .SH OPTIONS
+A command-line flag overrides
+.IR book.conf ,
+which overrides the built-in default.
+.TP
+.BI \-\-config " file"
+Book config to read (default
+.IR book.conf ,
+if present).
 .TP
 .BI \-\-outline " file"
-Outline file to read (default
+Outline file (default
 .IR outline.txt ).
 .TP
 .BI \-\-src " dir"
@@ -78,17 +90,39 @@ Directory holding the chapter source files (default
 Directory for the rendered output (default
 .IR rendered ).
 .TP
+.BI \-\-filemap " file"
+Authoritative
+.IR UUID:filename
+map (default
+.IR filemap.txt ,
+if present; otherwise headings are matched).
+.TP
+.BI \-\-template " file"
+Typst template to emit from (default
+.IR book.header.typ ,
+else
+.IR book.prefix.typ ,
+else the shared
+.IR template/book.typ ).
+.TP
 .BI \-\-number-map " file"
 Where to write the CSV audit (default
 .IR number_map.csv ).
 .TP
-.B \-\-ignore-unmatched
-Do not fail when a source file's heading matches no outline token.
+.BI \-\-slug " name"
+Book slug used to derive output names (default: the directory name).
 .TP
-.BI \-\-max-table-rows " n"
-Split tables longer than
-.I n
-rows (0 disables).
+.BI \-\-pdf " file"
+Book PDF output (default
+.IR <slug> .pdf).
+.TP
+.BI \-\-cover-src " file"
+Cover source (default
+.IR cover.typ ).
+.TP
+.BI \-\-cover " file"
+Cover PDF output (default
+.IR <slug> -cover.pdf).
 .
 .SH FILES
 .TP
@@ -104,19 +138,59 @@ Optional
 map.  When absent, each source file is matched by its first heading.
 .TP
 .I book.conf
-Book metadata (title, author, slug) in the OpenBSD-style configuration
-language, parsed by the hbnf runtime.
+Book metadata and build paths in the OpenBSD-style configuration language,
+parsed by the hbnf runtime.  See
+.B "CONFIGURATION"
+below.
+.TP
+.I template/book.typ
+The shared default Typst template.
 .TP
 .I number_map.csv
 Generated audit of every UUID and its rendered designation.
+.
+.SH CONFIGURATION
+.I book.conf
+is obconf syntax: bareword or "quoted" directives, `{ }` blocks, `#`
+comments, `;`- or newline-terminated entries.
+.PP
+.nf
+title "Telegraph to Turbo Jet"
+author "David Walther"
+slug   speedrun-telegraph-to-turbo-jet
+
+build {
+    outline    outline.txt
+    src        chapters
+    out        rendered
+    template   book.header.typ
+    number-map number_map.csv
+}
+
+cover {
+    source cover.typ
+    output speedrun-cover.pdf
+}
+.fi
+.PP
+Every field is optional; a field left out falls back to the built-in default
+(and any
+.B \-\-
+flag still overrides).  A malformed file is reported as
+.I file:line:col: message
+and stops the run.
 .
 .SH LIMITATIONS
 .PP
 A title or directive value runs to end of line, so it cannot contain a literal
 newline, and there is no trailing-comment syntax.  Each entry is addressed by a
-five-digit UUID, so a writer must look up a UUID rather than a number; the
-number map is the look-up aid.  A page reference to a section requires that
-section's heading to carry its token.  A
+UUID written
+.BR idNNNNN ,
+which is a name, not a number; the writer must look up a UUID rather than a
+number, and
+.I number_map.csv
+is the look-up aid.  A page reference to a section requires that section's
+heading to carry its token.  A
 .B k:
 sub-entry binds to the chapter whose UUID is its
 .B NNNNN
@@ -124,23 +198,18 @@ part, which the engine does not verify at parse time.  The book is emitted as
 one Typst document; splitting a book across volumes is a Makefile-level
 concern, not an engine feature.
 .
-.SH ENVIRONMENT
-.TP
-.B TYPST
-Path to the Typst compiler, used by
-.BR build .
-.
 .SH EXIT STATUS
-Zero on success; nonzero if the outline, file map, or a token reference is
-invalid, or if a subcommand is unknown.
+Zero on success; nonzero if the outline, file map, the config, or a token
+reference is invalid, or if a subcommand is unknown.
 .
 .SH EXAMPLES
 .PP
 .nf
+buildabook                    # typst -> pdf -> cover, building what it can
 buildabook check
-buildabook render --outline outline.txt --src chapters --out rendered
-buildabook spine book.pdf
-buildabook build
+buildabook typst --outline outline.txt --src chapters --out rendered
+buildabook cover --cover speedrun-cover.pdf
+buildabook number-map
 .fi
 .
 .SH SEE ALSO

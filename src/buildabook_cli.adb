@@ -17,6 +17,7 @@ with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
 with Build;
+with Config;
 with Materialize;
 with Shell;
 with Spine;
@@ -28,7 +29,7 @@ procedure Buildabook_Cli is
 
    -- ── configuration ────────────────────────────────────────────────────────
 
-   type Config is record
+   type Run_Config is record
       Outline    : Unbounded_String;
       Src        : Unbounded_String;
       Out_Dir    : Unbounded_String;
@@ -64,6 +65,26 @@ procedure Buildabook_Cli is
       return Default;
    end Argument_Value;
 
+   function Has_Flag (Name : String) return Boolean is
+      Long : constant String := "--" & Name;
+   begin
+      for I in 1 .. Ada.Command_Line.Argument_Count loop
+         declare
+            A : constant String := Ada.Command_Line.Argument (I);
+         begin
+            if A = Long then
+               return True;
+            elsif A'Length > Long'Length
+              and then A (A'First .. A'First + Long'Length - 1) = Long
+              and then A (A'First + Long'Length) = '='
+            then
+               return True;
+            end if;
+         end;
+      end loop;
+      return False;
+   end Has_Flag;
+
    type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_All);
 
    function Subcommand return Stage is
@@ -98,30 +119,47 @@ procedure Buildabook_Cli is
       return "";
    end Detect_Template;
 
-   function Load_Config return Config is
-      Slug : constant String :=
+   function Load_Config return Run_Config is
+      Slug_Default : constant String :=
         Ada.Directories.Simple_Name (Ada.Directories.Current_Directory);
+      Cfg : constant Config.Book_Config :=
+        Config.Load (Argument_Value ("config", "book.conf"));
+
+      --  flag > book.conf > built-in default
+      function V (Flag : String; Cfg_Val : String; Default : String) return String is
+      begin
+         if Has_Flag (Flag) then
+            return Argument_Value (Flag, Default);
+         elsif Cfg_Val /= "" then
+            return Cfg_Val;
+         else
+            return Default;
+         end if;
+      end V;
+
+      Slug : constant String := V ("slug", To_String (Cfg.Slug), Slug_Default);
    begin
-      return Config'
-        (Outline    => To_Unbounded_String (Argument_Value ("outline", "outline.txt")),
-         Src        => To_Unbounded_String (Argument_Value ("src", "chapters")),
-         Out_Dir    => To_Unbounded_String (Argument_Value ("out", "rendered")),
+      return Run_Config'
+        (Outline    => To_Unbounded_String
+                         (V ("outline", To_String (Cfg.Outline), "outline.txt")),
+         Src        => To_Unbounded_String
+                         (V ("src", To_String (Cfg.Src), "chapters")),
+         Out_Dir    => To_Unbounded_String
+                         (V ("out", To_String (Cfg.Out_Dir), "rendered")),
          Filemap    => To_Unbounded_String
-                         (Argument_Value ("filemap",
+                         (V ("filemap", "",
                             (if Ada.Directories.Exists ("filemap.txt")
                              then "filemap.txt" else ""))),
          Template   => To_Unbounded_String
-                         (Argument_Value ("template", Detect_Template)),
+                         (V ("template", To_String (Cfg.Template), Detect_Template)),
          Number_Map => To_Unbounded_String
-                         (Argument_Value ("number-map", "number_map.csv")),
-         Slug       => To_Unbounded_String (Argument_Value ("slug", Slug)),
-         Pdf        => To_Unbounded_String
-                         (Argument_Value ("pdf",
-                            Argument_Value ("slug", Slug) & ".pdf")),
-         Cover_Src  => To_Unbounded_String (Argument_Value ("cover-src", "cover.typ")),
+                         (V ("number-map", To_String (Cfg.Number_Map), "number_map.csv")),
+         Slug       => To_Unbounded_String (Slug),
+         Pdf        => To_Unbounded_String (V ("pdf", "", Slug & ".pdf")),
+         Cover_Src  => To_Unbounded_String
+                         (V ("cover-src", To_String (Cfg.Cover_Src), "cover.typ")),
          Cover_Out  => To_Unbounded_String
-                         (Argument_Value ("cover",
-                            Argument_Value ("slug", Slug) & "-cover.pdf")));
+                         (V ("cover", To_String (Cfg.Cover_Out), Slug & "-cover.pdf")));
    end Load_Config;
 
    -- ── output helpers ───────────────────────────────────────────────────────
@@ -159,6 +197,7 @@ procedure Buildabook_Cli is
       Put_Line ("just means the cover is skipped.");
       New_Line;
       Put_Line ("Options (all optional):");
+      Put_Line ("  --config PATH       book config (default book.conf if present)");
       Put_Line ("  --outline PATH      outline file (default outline.txt)");
       Put_Line ("  --src DIR           chapter source directory (default chapters)");
       Put_Line ("  --out DIR           render output directory (default rendered)");
@@ -173,7 +212,7 @@ procedure Buildabook_Cli is
 
    -- ── stages ───────────────────────────────────────────────────────────────
 
-   procedure Run_Typst (C : Config; Ok : out Boolean) is
+   procedure Run_Typst (C : Run_Config; Ok : out Boolean) is
       Errors : Materialize.Error_List;
    begin
       if not Ada.Directories.Exists (To_String (C.Outline)) then
@@ -221,7 +260,7 @@ procedure Buildabook_Cli is
       Ok := True;
    end Run_Typst;
 
-   procedure Run_Pdf (C : Config; Ok : out Boolean) is
+   procedure Run_Pdf (C : Run_Config; Ok : out Boolean) is
       Book_Typ : constant String := To_String (C.Out_Dir) & "/book.typ";
    begin
       if not Ada.Directories.Exists (Book_Typ) then
@@ -245,7 +284,7 @@ procedure Buildabook_Cli is
       Ok := True;
    end Run_Pdf;
 
-   procedure Run_Cover (C : Config; Ok : out Boolean) is
+   procedure Run_Cover (C : Run_Config; Ok : out Boolean) is
       Updated : Boolean;
    begin
       if not Ada.Directories.Exists (To_String (C.Cover_Src)) then
@@ -288,7 +327,7 @@ procedure Buildabook_Cli is
       Ok := True;
    end Run_Cover;
 
-   procedure Run_Number_Map (C : Config; Ok : out Boolean) is
+   procedure Run_Number_Map (C : Run_Config; Ok : out Boolean) is
    begin
       begin
          Build.Write_Number_Map_Only (To_String (C.Outline), To_String (C.Number_Map));
@@ -306,7 +345,7 @@ procedure Buildabook_Cli is
       Ok := True;
    end Run_Number_Map;
 
-   procedure Run_Check (C : Config; Ok : out Boolean) is
+   procedure Run_Check (C : Run_Config; Ok : out Boolean) is
       Errors   : Materialize.Error_List;
       Warnings : Materialize.Error_List;
       Res      : Build.Check_Result;
@@ -357,7 +396,6 @@ procedure Buildabook_Cli is
    -- ── main ────────────────────────────────────────────────────────────────
 
    Sub    : constant Stage := Subcommand;
-   C      : constant Config := Load_Config;
    Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok : Boolean;
 
 begin
@@ -369,32 +407,41 @@ begin
       return;
    end if;
 
-   case Sub is
-      when S_Typst =>
-         Run_Typst (C, Typst_Ok);
-         Ada.Command_Line.Set_Exit_Status (if Typst_Ok then 0 else 1);
-      when S_Pdf =>
-         Run_Pdf (C, Pdf_Ok);
-         Ada.Command_Line.Set_Exit_Status (if Pdf_Ok then 0 else 1);
-      when S_Cover =>
-         Run_Cover (C, Cover_Ok);
-         Ada.Command_Line.Set_Exit_Status (if Cover_Ok then 0 else 1);
-      when S_Check =>
-         Run_Check (C, Check_Ok);
-         Ada.Command_Line.Set_Exit_Status (if Check_Ok then 0 else 1);
-      when S_Number_Map =>
-         Run_Number_Map (C, Number_Map_Ok);
-         Ada.Command_Line.Set_Exit_Status (if Number_Map_Ok then 0 else 1);
-      when S_All =>
-         --  default: build what it can, in order, each stage guarded by the
-         --  previous stage's output so a failure never cascades.
-         Run_Typst (C, Typst_Ok);
-         if Typst_Ok then
+   declare
+      C : Run_Config;
+   begin
+      C := Load_Config;
+      case Sub is
+         when S_Typst =>
+            Run_Typst (C, Typst_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Typst_Ok then 0 else 1);
+         when S_Pdf =>
             Run_Pdf (C, Pdf_Ok);
-            if Pdf_Ok then
-               Run_Cover (C, Cover_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Pdf_Ok then 0 else 1);
+         when S_Cover =>
+            Run_Cover (C, Cover_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Cover_Ok then 0 else 1);
+         when S_Check =>
+            Run_Check (C, Check_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Check_Ok then 0 else 1);
+         when S_Number_Map =>
+            Run_Number_Map (C, Number_Map_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Number_Map_Ok then 0 else 1);
+         when S_All =>
+            --  default: build what it can, in order, each stage guarded by the
+            --  previous stage's output so a failure never cascades.
+            Run_Typst (C, Typst_Ok);
+            if Typst_Ok then
+               Run_Pdf (C, Pdf_Ok);
+               if Pdf_Ok then
+                  Run_Cover (C, Cover_Ok);
+               end if;
             end if;
-         end if;
-         Ada.Command_Line.Set_Exit_Status (if Typst_Ok then 0 else 1);
-   end case;
+            Ada.Command_Line.Set_Exit_Status (if Typst_Ok then 0 else 1);
+      end case;
+   exception
+      when E : Config.Config_Error =>
+         Err (Ada.Exceptions.Exception_Message (E));
+         Ada.Command_Line.Set_Exit_Status (1);
+   end;
 end Buildabook_Cli;

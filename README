@@ -64,8 +64,8 @@ What it does
   change before compiling.
 * **No giant tables.** Markdown tables longer than a page are split with the
   header row repeated.
-* **Cover spine.** `buildabook spine` rewrites the spine width in `cover.typ`
-  from the PDF page count.
+* **Cover spine.** `buildabook cover` rewrites the spine width in `cover.typ`
+  from the PDF page count, then compiles the cover.
 
 The input language is specified in `LANGUAGE.md`.
 
@@ -89,11 +89,17 @@ the container if you prefer that to a host toolchain.
 Usage
 -----
 
-    buildabook render        outline -> rendered/book.typ + number_map.csv
+    buildabook               typst -> pdf -> cover, building what it can
+    buildabook typst         render rendered/book.typ + number_map.csv
+    buildabook pdf           compile rendered/book.typ with Typst
+    buildabook cover         update the cover spine, compile cover.typ
     buildabook check         validate outline, filemap, and tokens; emit nothing
     buildabook number-map    write number_map.csv only
-    buildabook spine <pdf>   rewrite the cover spine width from a page count
-    buildabook build         render, then compile the PDF with Typst
+
+A command-line flag overrides `book.conf`, which overrides the built-in
+default. The default (`buildabook` with no subcommand) builds all three stages
+in order, and a missing or failing stage never blocks the next: no `cover.typ`
+just means the cover is skipped, never the book or the PDF.
 
 How it works
 ------------
@@ -102,8 +108,8 @@ The pipeline is one source, one document, one pass:
 
     chapters/*.md + outline.txt + filemap.txt
           |
-    buildabook render   parse the outline, number it, resolve every {{token}},
-          |             split oversized tables, and emit rendered/book.typ
+    buildabook typst   parse the outline, number it, resolve every {{token}},
+          |            split oversized tables, and emit rendered/book.typ
     typst compile rendered/book.typ   ->   the PDF
 
 The engine parses `outline.txt` with an hbnf-generated parser, applies the
@@ -112,6 +118,35 @@ It then builds a token map (`c:id00042 -> "Chapter 42"`, and so on) and rewrites
 each chapter source, substituting tokens and planting page markers. The
 resulting Typst document imports a template and calls `#chapter(...)` once per
 entry.
+
+Configuration
+-------------
+
+`book.conf` supplies per-book metadata and build paths, in obconf syntax
+(bareword or `"quoted"` directives, `{ }` blocks, `#` comments):
+
+    title "Telegraph to Turbo Jet"
+    author "David Walther"
+    slug   speedrun-telegraph-to-turbo-jet
+
+    build {
+        outline    outline.txt
+        src        chapters
+        out        rendered
+        template   book.header.typ
+        number-map number_map.csv
+    }
+
+    cover {
+        source cover.typ
+        output speedrun-cover.pdf
+    }
+
+Every field is optional and every `--`-flag overrides it. The `slug` derives
+the PDF and cover output names; the `build` and `cover` blocks name the input
+and output paths. A malformed file is reported as `file:line:col: message`.
+It is parsed by hbnf's `HBNF_Config` crate, the same obconf grammar the outline
+uses.
 
 The template
 ------------

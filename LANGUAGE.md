@@ -263,7 +263,7 @@ every `{{c:id10002}}` in the prose follows automatically.
 ```
 chapters/*.md + outline.txt + filemap.txt
       │
-buildabook render   resolves every {{token}} → rendered/*.md + rendered/book.typ
+buildabook typst   resolves every {{token}} → rendered/*.md + rendered/book.typ
       │
 typst compile rendered/book.typ   →   the PDF
 ```

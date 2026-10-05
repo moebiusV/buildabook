@@ -3,9 +3,11 @@
 --  Reads a book's outline.txt + book.conf, resolves {{token}} cross-references,
 --  and emits a Typst book.typ plus a number_map.csv audit.  The outline is
 --  parsed by an hbnf-generated grammar (outline_grammar.*, checked in); the
---  book.conf reader will pull in hbnf's HBNF_Config crate (with "hbnf_config"),
+--  book.conf reader pulls in hbnf's HBNF_Config crate (with "hbnf_config"),
 --  whose code templates are Mustache — mustache is then pulled in
 --  transitively, never linked directly here.
+
+with "hbnf_config";
 
 project Buildabook is
 
