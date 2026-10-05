@@ -184,6 +184,67 @@ package body Materialize is
       end;
    end Split_Long_Tables;
 
+   -- ── token substitution ───────────────────────────────────────────────────
+
+   --  Replace every {{…}} token in Text with its resolved value, appending one
+   --  "path:line: message" entry to Errors per unresolvable token.  The output
+   --  is not yet the final file — section page markers are planted by the
+   --  caller.
+   function Substitute
+     (R : Tokens.Resolver; Text : String; Src_Path : String;
+      Errors : in out Error_List) return Unbounded_String is
+
+      Acc      : Unbounded_String;
+      P        : Natural := Text'First;
+      Tok_Line : Natural := 1;
+   begin
+      while P <= Text'Last loop
+         if P < Text'Last and then Text (P) = '{' and then Text (P + 1) = '{' then
+            declare
+               Q : constant Natural :=
+                 Ada.Strings.Fixed.Index (Text (P + 2 .. Text'Last), "}}");
+            begin
+               if Q = 0 then
+                  Append (Acc, "{{");
+                  P := P + 2;
+               else
+                  declare
+                     Tok_Body : constant String := Text (P + 2 .. Q - 1);
+                     Rendered : Unbounded_String;
+                  begin
+                     begin
+                        Append (Rendered, Tokens.Resolve (R, Tok_Body));
+                     exception
+                        when E : Tokens.Tokens_Error =>
+                           declare
+                              Msg : constant String :=
+                                Ada.Exceptions.Exception_Message (E);
+                           begin
+                              Errors.Append
+                                (To_Unbounded_String
+                                   (Src_Path & ":" &
+                                    Ada.Strings.Fixed.Trim
+                                      (Natural'Image (Tok_Line),
+                                       Ada.Strings.Left) & ": " & Msg));
+                              Append (Rendered, "{{ERROR:" & Msg & "}}");
+                           end;
+                     end;
+                     Append (Acc, Rendered);
+                  end;
+                  P := Q + 2;
+               end if;
+            end;
+         else
+            if Text (P) = ASCII.LF then
+               Tok_Line := Tok_Line + 1;
+            end if;
+            Append (Acc, Text (P));
+            P := P + 1;
+         end if;
+      end loop;
+      return Acc;
+   end Substitute;
+
    -- ── materialize one file ─────────────────────────────────────────────────
 
    function Is_Heading (Line : String) return Boolean is
@@ -279,76 +340,36 @@ package body Materialize is
          Line_No := Line_No + 1;
       end loop;
 
-      --  Second: substitute every {{…}} token.
+      --  Second: substitute every {{…}} token, then plant the page markers
+      --  after the section headings.
       declare
-         Acc      : Unbounded_String;
-         P        : Natural := Text'First;
-         Tok_Line : Natural := 1;
+         Acc : constant Unbounded_String := Substitute (R, Text, Src_Path, Errors);
+         Lines : Line_Vectors.Vector := Split_Lines (To_String (Acc));
       begin
-         while P <= Text'Last loop
-            if P < Text'Last and then Text (P) = '{' and then Text (P + 1) = '{' then
-               declare
-                  Q : constant Natural :=
-                    Ada.Strings.Fixed.Index (Text (P + 2 .. Text'Last), "}}");
-               begin
-                  if Q = 0 then
-                     Append (Acc, "{{");
-                     P := P + 2;
-                  else
-                     declare
-                        Tok_Body : constant String := Text (P + 2 .. Q - 1);
-                     begin
-                        declare
-                           Rendered : constant String := Tokens.Resolve (R, Tok_Body);
-                        begin
-                           Append (Acc, Rendered);
-                        exception
-                           when E : Tokens.Tokens_Error =>
-                              declare
-                                 Msg : constant String :=
-                                   Ada.Exceptions.Exception_Message (E);
-                              begin
-                                 Errors.Append
-                                   (To_Unbounded_String
-                                      (Src_Path & ":" &
-                                       Ada.Strings.Fixed.Trim
-                                         (Natural'Image (Tok_Line),
-                                          Ada.Strings.Left) & ": " & Msg));
-                                 Append (Acc, "{{ERROR:" & Msg & "}}");
-                              end;
-                        end;
-                     end;
-                     P := Q + 2;
-                  end if;
-               end;
-            else
-               if Text (P) = ASCII.LF then
-                  Tok_Line := Tok_Line + 1;
-               end if;
-               Append (Acc, Text (P));
-               P := P + 1;
-            end if;
+         for K in reverse 1 .. Natural (Marks.Length) loop
+            declare
+               M : Section_Mark renames Marks (K);
+            begin
+               Lines.Insert
+                 (M.Line + 2,
+                  To_Unbounded_String ("<!--raw-typst #pgan(""" &
+                                       To_String (M.Uuid) & """)-->"));
+            end;
          end loop;
 
-         --  Third: plant the page markers after the section headings.
-         declare
-            Lines : Line_Vectors.Vector := Split_Lines (To_String (Acc));
-         begin
-            for K in reverse 1 .. Natural (Marks.Length) loop
-               declare
-                  M : Section_Mark renames Marks (K);
-               begin
-                  Lines.Insert
-                    (M.Line + 2,
-                     To_Unbounded_String ("<!--raw-typst #pgan(""" &
-                                          To_String (M.Uuid) & """)-->"));
-               end;
-            end loop;
-
-            Files.Write
-              (Dst_Path, Split_Long_Tables (Join_Lines (Lines), 40));
-         end;
+         Files.Write
+           (Dst_Path, Split_Long_Tables (Join_Lines (Lines), 40));
       end;
    end Materialize_File;
+
+   --  Resolve every {{…}} token in Src_Path without writing anything, so the
+   --  check subcommand can validate a book before any output is produced.
+   procedure Check_File
+     (R : Tokens.Resolver; Src_Path : String; Errors : in out Error_List) is
+      Ignored : constant Unbounded_String :=
+        Substitute (R, Files.Read (Src_Path), Src_Path, Errors);
+   begin
+      null;
+   end Check_File;
 
 end Materialize;

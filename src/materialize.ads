@@ -29,4 +29,12 @@ package Materialize is
       Dst_Path : String;
       Errors   : in out Error_List);
 
+   --  Resolve every {{…}} token in Src_Path without writing anything,
+   --  appending one "path:line: message" entry to Errors per unresolvable
+   --  token.  Used by `buildabook check` to validate before emitting.
+   procedure Check_File
+     (R        : Tokens.Resolver;
+      Src_Path : String;
+      Errors   : in out Error_List);
+
 end Materialize;

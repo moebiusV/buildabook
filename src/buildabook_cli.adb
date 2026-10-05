@@ -12,6 +12,7 @@
 with Ada.Command_Line;
 with Ada.Directories;
 with Ada.Exceptions;
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
@@ -63,7 +64,7 @@ procedure Buildabook_Cli is
       return Default;
    end Argument_Value;
 
-   type Stage is (S_Typst, S_Pdf, S_Cover, S_All);
+   type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_All);
 
    function Subcommand return Stage is
    begin
@@ -77,6 +78,10 @@ procedure Buildabook_Cli is
                return S_Pdf;
             elsif A = "cover" then
                return S_Cover;
+            elsif A = "check" then
+               return S_Check;
+            elsif A = "number-map" then
+               return S_Number_Map;
             end if;
          end;
       end if;
@@ -143,9 +148,11 @@ procedure Buildabook_Cli is
       Put_Line ("Usage: buildabook [typst|pdf|cover] [options]");
       New_Line;
       Put_Line ("With no subcommand, build all three stages in order:");
-      Put_Line ("  typst  render rendered/book.typ + number_map.csv from outline.txt");
-      Put_Line ("  pdf    compile rendered/book.typ to a PDF");
-      Put_Line ("  cover  update the cover spine and compile cover.typ");
+      Put_Line ("  typst       render rendered/book.typ + number_map.csv from outline.txt");
+      Put_Line ("  pdf         compile rendered/book.typ to a PDF");
+      Put_Line ("  cover       update the cover spine and compile cover.typ");
+      Put_Line ("  check       validate outline + filemap + tokens, emit nothing");
+      Put_Line ("  number-map  write number_map.csv only");
       New_Line;
       Put_Line ("Each stage reports what is missing and what it needs, and a");
       Put_Line ("missing or failing stage never blocks the others — no cover.typ");
@@ -281,11 +288,77 @@ procedure Buildabook_Cli is
       Ok := True;
    end Run_Cover;
 
+   procedure Run_Number_Map (C : Config; Ok : out Boolean) is
+   begin
+      begin
+         Build.Write_Number_Map_Only (To_String (C.Outline), To_String (C.Number_Map));
+      exception
+         when E : Build.Build_Error =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+         when E : others =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+      end;
+      Msg ("wrote " & To_String (C.Number_Map));
+      Ok := True;
+   end Run_Number_Map;
+
+   procedure Run_Check (C : Config; Ok : out Boolean) is
+      Errors   : Materialize.Error_List;
+      Warnings : Materialize.Error_List;
+      Res      : Build.Check_Result;
+   begin
+      begin
+         Res := Build.Check
+           (To_String (C.Outline), To_String (C.Src), To_String (C.Filemap),
+            Errors, Warnings);
+      exception
+         when E : Build.Build_Error =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+         when E : others =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+      end;
+
+      for I in 1 .. Natural (Warnings.Length) loop
+         Err ("warning: " & To_String (Warnings (I)));
+      end loop;
+
+      for I in 1 .. Natural (Errors.Length) loop
+         Err (To_String (Errors (I)));
+      end loop;
+
+      Msg ("Preflight: "
+        & Ada.Strings.Fixed.Trim (Natural'Image (Res.Matched), Ada.Strings.Left)
+        & " outline entries matched, "
+        & Ada.Strings.Fixed.Trim (Natural'Image (Res.Missing), Ada.Strings.Left)
+        & " entries without files, "
+        & Ada.Strings.Fixed.Trim (Natural'Image (Res.Unmatched), Ada.Strings.Left)
+        & " unmatched files, "
+        & Ada.Strings.Fixed.Trim (Natural'Image (Res.Rows), Ada.Strings.Left)
+        & " outline rows.");
+
+      if Natural (Errors.Length) /= 0 then
+         Err (Ada.Strings.Fixed.Trim (Natural'Image (Natural (Errors.Length)), Ada.Strings.Left)
+              & " error(s) — check failed.");
+         Ok := False;
+      else
+         Msg ("All tokens resolved successfully.");
+         Ok := True;
+      end if;
+   end Run_Check;
+
    -- ── main ────────────────────────────────────────────────────────────────
 
    Sub    : constant Stage := Subcommand;
    C      : constant Config := Load_Config;
-   Typst_Ok, Pdf_Ok, Cover_Ok : Boolean;
+   Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok : Boolean;
 
 begin
    if Ada.Command_Line.Argument_Count >= 1
@@ -306,6 +379,12 @@ begin
       when S_Cover =>
          Run_Cover (C, Cover_Ok);
          Ada.Command_Line.Set_Exit_Status (if Cover_Ok then 0 else 1);
+      when S_Check =>
+         Run_Check (C, Check_Ok);
+         Ada.Command_Line.Set_Exit_Status (if Check_Ok then 0 else 1);
+      when S_Number_Map =>
+         Run_Number_Map (C, Number_Map_Ok);
+         Ada.Command_Line.Set_Exit_Status (if Number_Map_Ok then 0 else 1);
       when S_All =>
          --  default: build what it can, in order, each stage guarded by the
          --  previous stage's output so a failure never cascades.

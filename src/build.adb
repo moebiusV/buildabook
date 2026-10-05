@@ -208,6 +208,64 @@ package body Build is
       return Token_To_File;
    end Build_File_Map;
 
+   --  Resolve a filemap filename to a source path: Src_Dir-relative when it
+   --  carries no directory component, otherwise as-is (already a path).
+   function Resolve_Path (Src_Dir : String; Fname : String) return String is
+   begin
+      return (if Ada.Strings.Fixed.Index (Fname, "/") = 0
+              then Ada.Directories.Compose (Src_Dir, Fname)
+              else Fname);
+   end Resolve_Path;
+
+   --  The ordered, deduplicated list of non-.typ filenames, in outline row
+   --  order — the work list both the render and the check pass walk.
+   function Ordered_Files
+     (O : Outline.Outline_Type; FM : Emit.File_Maps.Map) return Str_Vectors.Vector is
+      Seen   : Emit.File_Maps.Map;   -- (ab)used as a set: filename → ""
+      Result : Str_Vectors.Vector;
+   begin
+      for I in 1 .. Natural (O.Rows.Length) loop
+         declare
+            E : Outline.Row renames O.Rows (I);
+         begin
+            if E.K in Outline.Section | Outline.Sub_Entry then
+               null;
+            elsif not FM.Contains (To_String (E.Token)) then
+               null;
+            elsif Seen.Contains (FM.Element (To_String (E.Token))) then
+               null;
+            else
+               declare
+                  Fname : constant String := FM.Element (To_String (E.Token));
+               begin
+                  Seen.Insert (Fname, "");
+                  if not Ends_With (Fname, ".typ") then
+                     Result.Append (To_Unbounded_String (Fname));
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+      return Result;
+   end Ordered_Files;
+
+   --  .md files in Src_Dir that no outline token maps to.
+   function Compute_Unmatched
+     (Src_Dir : String; FM : Emit.File_Maps.Map) return Str_Vectors.Vector is
+      Mapped : Emit.File_Maps.Map;   -- (ab)used as a set: filename → ""
+      Result : Str_Vectors.Vector;
+   begin
+      for Cur in FM.Iterate loop
+         Mapped.Include (Emit.File_Maps.Element (Cur), "");
+      end loop;
+      for Fname of List_Md (Src_Dir) loop
+         if not Mapped.Contains (To_String (Fname)) then
+            Result.Append (Fname);
+         end if;
+      end loop;
+      return Result;
+   end Compute_Unmatched;
+
    --  Register {{anchor:ID}} tokens so {{page:ID}} can validate against them.
    procedure Register_Anchors (R : in out Tokens.Resolver; Text : String) is
       P : Natural := Text'First;
@@ -261,6 +319,9 @@ package body Build is
       if not Ada.Directories.Exists (Outline_Path) then
          raise Build_Error with "missing " & Outline_Path & " (the outline is required)";
       end if;
+      if not Ada.Directories.Exists (Src_Dir) then
+         raise Build_Error with "missing " & Src_Dir & " (the chapter sources are required)";
+      end if;
 
       O := Outline.Load (Outline_Path);
       R.O := O;
@@ -285,80 +346,30 @@ package body Build is
       end if;
       Ada.Directories.Create_Path (Out_Dir);
 
-      --  Pass A: register anchors across all source files, in outline order.
       declare
-         Seen : Emit.File_Maps.Map;   -- (ab)used as a set: filename → ""
+         Files_List : constant Str_Vectors.Vector := Ordered_Files (O, FM);
       begin
-         for I in 1 .. Natural (O.Rows.Length) loop
+         --  Pass A: register anchors across all source files.
+         for Fname of Files_List loop
             declare
-               E : Outline.Row renames O.Rows (I);
+               Path : constant String := Resolve_Path (Src_Dir, To_String (Fname));
             begin
-               if E.K in Outline.Section | Outline.Sub_Entry then
-                  null;
-               elsif not FM.Contains (To_String (E.Token)) then
-                  null;
-               elsif Seen.Contains (FM.Element (To_String (E.Token))) then
-                  null;
-               else
-                  declare
-                     Fname : constant String := FM.Element (To_String (E.Token));
-                  begin
-                     Seen.Insert (Fname, "");
-                     if not Ends_With (Fname, ".typ") then
-                        declare
-                           Path : constant String :=
-                             (if Ada.Strings.Fixed.Index (Fname, "/") = 0
-                              then Ada.Directories.Compose (Src_Dir, Fname)
-                              else Fname);
-                        begin
-                           if Ada.Directories.Exists (Path) then
-                              Register_Anchors (R, Files.Read (Path));
-                           end if;
-                        end;
-                     end if;
-                  end;
+               if Ada.Directories.Exists (Path) then
+                  Register_Anchors (R, Files.Read (Path));
                end if;
             end;
          end loop;
-      end;
 
-      --  Pass B: materialize each file.
-      declare
-         Seen : Emit.File_Maps.Map;
-      begin
-         for I in 1 .. Natural (O.Rows.Length) loop
+         --  Pass B: materialize each file.
+         for Fname of Files_List loop
             declare
-               E : Outline.Row renames O.Rows (I);
+               Path : constant String := Resolve_Path (Src_Dir, To_String (Fname));
             begin
-               if E.K in Outline.Section | Outline.Sub_Entry then
-                  null;
-               elsif not FM.Contains (To_String (E.Token)) then
-                  null;
-               elsif Seen.Contains (FM.Element (To_String (E.Token))) then
-                  null;
-               else
-                  declare
-                     Fname : constant String := FM.Element (To_String (E.Token));
-                     Base  : constant String :=
-                       Ada.Directories.Simple_Name (Fname);
-                  begin
-                     Seen.Insert (Fname, "");
-                     if not Ends_With (Fname, ".typ") then
-                        declare
-                           Path : constant String :=
-                             (if Ada.Strings.Fixed.Index (Fname, "/") = 0
-                              then Ada.Directories.Compose (Src_Dir, Fname)
-                              else Fname);
-                        begin
-                           if Ada.Directories.Exists (Path) then
-                              Materialize.Materialize_File
-                                (R, Path,
-                                 Ada.Directories.Compose (Out_Dir, Base),
-                                 Errors);
-                           end if;
-                        end;
-                     end if;
-                  end;
+               if Ada.Directories.Exists (Path) then
+                  Materialize.Materialize_File
+                    (R, Path,
+                     Ada.Directories.Compose (Out_Dir, Ada.Directories.Simple_Name (To_String (Fname))),
+                     Errors);
                end if;
             end;
          end loop;
@@ -374,5 +385,111 @@ package body Build is
 
       return Errors;
    end Render;
+
+   -- ── number-map ───────────────────────────────────────────────────────────
+
+   procedure Write_Number_Map_Only (Outline_Path : String; Number_Map : String) is
+   begin
+      if not Ada.Directories.Exists (Outline_Path) then
+         raise Build_Error with
+           "missing " & Outline_Path & " (needed to write " & Number_Map & ")";
+      end if;
+      Emit.Write_Number_Map (Outline.Load (Outline_Path), Number_Map);
+   end Write_Number_Map_Only;
+
+   -- ── check ────────────────────────────────────────────────────────────────
+
+   function Check
+     (Outline_Path : String;
+      Src_Dir      : String;
+      Filemap_Path : String;
+      Errors       : in out Materialize.Error_List;
+      Warnings     : in out Materialize.Error_List) return Check_Result is
+
+      O     : Outline.Outline_Type;
+      R     : Tokens.Resolver;
+      FM    : Emit.File_Maps.Map;
+      Fmap  : constant Emit.File_Maps.Map := Read_Filemap (Filemap_Path);
+      Res   : Check_Result := (others => 0);
+   begin
+      if not Ada.Directories.Exists (Outline_Path) then
+         raise Build_Error with "missing " & Outline_Path & " (needed to check the book)";
+      end if;
+      if not Ada.Directories.Exists (Src_Dir) then
+         raise Build_Error with "missing " & Src_Dir & " (needed to check the book)";
+      end if;
+
+      O := Outline.Load (Outline_Path);
+      R.O := O;
+      Res.Rows := Natural (O.Rows.Length);
+
+      FM := Build_File_Map (O, Src_Dir, Fmap);
+
+      --  unmatched files: fatal only when no filemap was in play (heading
+      --  fallback), matching render.py; otherwise a warning.
+      declare
+         Unmatched : constant Str_Vectors.Vector := Compute_Unmatched (Src_Dir, FM);
+      begin
+         Res.Unmatched := Natural (Unmatched.Length);
+         for F of Unmatched loop
+            declare
+               Msg : constant String :=
+                 "file '" & To_String (F) & "' has no matching outline token in its "
+                 & "heading — fix the heading, add it to the outline, or remove the file";
+            begin
+               if Fmap.Is_Empty then
+                  Errors.Append (To_Unbounded_String (Msg));
+               else
+                  Warnings.Append (To_Unbounded_String (Msg & " (excluded from book)"));
+               end if;
+            end;
+         end loop;
+      end;
+
+      --  matched vs missing entries (parts, sections and stacks may be fileless).
+      for I in 1 .. Natural (O.Rows.Length) loop
+         declare
+            E : Outline.Row renames O.Rows (I);
+         begin
+            if E.K in Outline.Section | Outline.Sub_Entry | Outline.Part then
+               null;
+            elsif FM.Contains (To_String (E.Token)) then
+               Res.Matched := Res.Matched + 1;
+            else
+               Res.Missing := Res.Missing + 1;
+               Warnings.Append
+                 (To_Unbounded_String
+                    ("outline entry " & To_String (E.Token) & " '"
+                     & To_String (E.Title) & "' has no source file"));
+            end if;
+         end;
+      end loop;
+
+      --  resolve every token, two passes (anchors first, then resolution).
+      declare
+         Files_List : constant Str_Vectors.Vector := Ordered_Files (O, FM);
+      begin
+         for Fname of Files_List loop
+            declare
+               Path : constant String := Resolve_Path (Src_Dir, To_String (Fname));
+            begin
+               if Ada.Directories.Exists (Path) then
+                  Register_Anchors (R, Files.Read (Path));
+               end if;
+            end;
+         end loop;
+         for Fname of Files_List loop
+            declare
+               Path : constant String := Resolve_Path (Src_Dir, To_String (Fname));
+            begin
+               if Ada.Directories.Exists (Path) then
+                  Materialize.Check_File (R, Path, Errors);
+               end if;
+            end;
+         end loop;
+      end;
+
+      return Res;
+   end Check;
 
 end Build;
