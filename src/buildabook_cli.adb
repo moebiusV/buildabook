@@ -85,7 +85,7 @@ procedure Buildabook_Cli is
       return False;
    end Has_Flag;
 
-   type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_All);
+   type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_Uuid, S_All);
 
    function Subcommand return Stage is
    begin
@@ -103,6 +103,8 @@ procedure Buildabook_Cli is
                return S_Check;
             elsif A = "number-map" then
                return S_Number_Map;
+            elsif A = "uuid" then
+               return S_Uuid;
             end if;
          end;
       end if;
@@ -191,6 +193,7 @@ procedure Buildabook_Cli is
       Put_Line ("  cover       update the cover spine and compile cover.typ");
       Put_Line ("  check       validate outline + filemap + tokens, emit nothing");
       Put_Line ("  number-map  write number_map.csv only");
+      Put_Line ("  uuid [c|p|a|d|n|s|k]  print the next free UUID (optionally prefixed)");
       New_Line;
       Put_Line ("Each stage reports what is missing and what it needs, and a");
       Put_Line ("missing or failing stage never blocks the others — no cover.typ");
@@ -393,10 +396,34 @@ procedure Buildabook_Cli is
       end if;
    end Run_Check;
 
+   procedure Run_Uuid (C : Run_Config; Ok : out Boolean) is
+      Prefix : constant String :=
+        (if Ada.Command_Line.Argument_Count >= 2
+         then Ada.Command_Line.Argument (2) else "");
+   begin
+      declare
+         Uuid : constant String :=
+           Build.Next_Uuid (To_String (C.Outline), To_String (C.Src));
+      begin
+         if Prefix'Length = 1
+           and then Prefix (Prefix'First) in 'c' | 'p' | 'a' | 'd' | 'n' | 's' | 'k'
+         then
+            Put_Line (Prefix & ":" & Uuid);
+         else
+            Put_Line (Uuid);
+         end if;
+         Ok := True;
+      end;
+   exception
+      when E : others =>
+         Err (Ada.Exceptions.Exception_Message (E));
+         Ok := False;
+   end Run_Uuid;
+
    -- ── main ────────────────────────────────────────────────────────────────
 
    Sub    : constant Stage := Subcommand;
-   Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok : Boolean;
+   Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok, Uuid_Ok : Boolean;
 
 begin
    if Ada.Command_Line.Argument_Count >= 1
@@ -427,6 +454,9 @@ begin
          when S_Number_Map =>
             Run_Number_Map (C, Number_Map_Ok);
             Ada.Command_Line.Set_Exit_Status (if Number_Map_Ok then 0 else 1);
+         when S_Uuid =>
+            Run_Uuid (C, Uuid_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Uuid_Ok then 0 else 1);
          when S_All =>
             --  default: build what it can, in order, each stage guarded by the
             --  previous stage's output so a failure never cascades.

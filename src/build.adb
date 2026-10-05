@@ -492,4 +492,61 @@ package body Build is
       return Res;
    end Check;
 
+   -- ── uuid ─────────────────────────────────────────────────────────────────
+
+   --  Track the highest idNNNNN seen in Text (the "id" is two literal letters
+   --  followed by exactly five digits; a trailing ".MINOR" is ignored).
+   procedure Scan_Uuids (Text : String; Max : in out Natural) is
+      P : Natural := Text'First;
+   begin
+      while P + 6 <= Text'Last loop
+         if Text (P .. P + 1) = "id"
+           and then (for all K in P + 2 .. P + 6 => Text (K) in '0' .. '9')
+         then
+            declare
+               N : Natural := 0;
+            begin
+               for K in P + 2 .. P + 6 loop
+                  N := N * 10 + (Character'Pos (Text (K)) - Character'Pos ('0'));
+               end loop;
+               if N > Max then
+                  Max := N;
+               end if;
+            end;
+            P := P + 7;
+         else
+            P := P + 1;
+         end if;
+      end loop;
+   end Scan_Uuids;
+
+   function Next_Uuid (Outline_Path : String; Src_Dir : String) return String is
+      Max : Natural := 0;
+   begin
+      if Ada.Directories.Exists (Outline_Path) then
+         Scan_Uuids (Files.Read (Outline_Path), Max);
+      end if;
+      if Ada.Directories.Exists (Src_Dir) then
+         for Fname of List_Md (Src_Dir) loop
+            Scan_Uuids
+              (Files.Read (Ada.Directories.Compose (Src_Dir, To_String (Fname))),
+               Max);
+         end loop;
+      end if;
+
+      declare
+         Next : constant Natural := Max + 1;
+         D    : constant String :=
+           Ada.Strings.Fixed.Trim (Natural'Image (Next), Ada.Strings.Left);
+      begin
+         case D'Length is
+            when 1      => return "id0000" & D;
+            when 2      => return "id000" & D;
+            when 3      => return "id00" & D;
+            when 4      => return "id0" & D;
+            when others => return "id" & D;
+         end case;
+      end;
+   end Next_Uuid;
+
 end Build;

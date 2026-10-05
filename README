@@ -96,6 +96,7 @@ Usage
     buildabook cover         update the cover spine, compile cover.typ
     buildabook check         validate outline, filemap, and tokens; emit nothing
     buildabook number-map    write number_map.csv only
+    buildabook uuid [c|p|a|d|n|s|k]  print the next free UUID
 
 A command-line flag overrides `book.conf`, which overrides the built-in
 default. The default (`buildabook` with no subcommand) builds all three stages

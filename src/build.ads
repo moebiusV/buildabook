@@ -43,4 +43,10 @@ package Build is
       Errors       : in out Materialize.Error_List;
       Warnings     : in out Materialize.Error_List) return Check_Result;
 
+   --  The next free idNNNNN: the highest UUID already in use (scanned from the
+   --  outline and every .md source file) plus one, zero-padded to five digits.
+   --  Used by `buildabook uuid` so a writer (human or LLM) can mint a fresh
+   --  UUID for a new chapter, section, or anchor without colliding.
+   function Next_Uuid (Outline_Path : String; Src_Dir : String) return String;
+
 end Build;
