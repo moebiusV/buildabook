@@ -1,12 +1,14 @@
 ; outline.hbnf — the book outline language, as an hbnf grammar.
-; One entry per line: content (c:uniq00001  Title) or directive (c:label:Warrant|Wt).
-; A title or value runs greedy to end of line because title_char/value atoms
-; exclude LF, and LF itself is whitespace (skipped, as in obconf).  word/int/
-; str are re-declared as char rules to suppress the built-in jets.
+; One entry per line: content (c:id00001  Title) or directive (c:label:Warrant|Wt).
+; The grammar is line-oriented: `ws` skips blanks, CR and `#` comments but NOT
+; the line feed, so a title or a value (free text to end of line) can never run
+; on into the next line; each line, blank or not, ends with an LF.  (The
+; engine appends an LF to the file text, so a last line without one parses.)
 ;
-;   content   = prefix ":" uuid [ title ]          c:uniq00001  Title
+;   content   = prefix ":" uuid [ title ]          c:id00001  Title
 ;   directive = prefix ":" name ":" value          c:label:Warrant|Wt
-;   name is a fixed keyword set; value is free text (word/int/|/title atoms).
+;   name is a fixed keyword set; value is free text (a title with no limit on
+;   what it holds: words, `|`, digits, blanks inside).
 
 language Ada
 
@@ -14,44 +16,34 @@ include "common.hbnf"
 
 whitespace ws
 
-; ── structure (the root is the FIRST rule) ─────────────────────────────
-; entries are self-delimiting: title/value run greedy to EOL, and LF is
-; whitespace (as in obconf), so blank and comment lines skip entirely.
-outline   = *( entry )
+; -- structure (the root is the FIRST rule) --------------------------------
+outline   = *( line )
+line      = [ entry ] eol
 entry     = content | directive
 content   = prefix COLON uuid [ title ]
 directive = prefix COLON tail
 tail      = name COLON value
+value     = [ title ]
+eol       = LF
 
-; ── the directive keyword set (render.py's DIRECTIVE_RE) ───────────────
+; -- the directive keyword set ---------------------------------------------
 name      = "label" | "number" | "count" | "default" | "none"
 
-; ── custom tokens (declared before word/int/str so they win ties) ─────
+; -- tokens ------------------------------------------------------------------
 prefix     = 'c' | 'p' | 'a' | 'd' | 'n' | 'u' | 's' | 'k'
-; a uuid is one token: "uniq" + digits, or "uniq" + digits.digits (the k-stack
-; minor).  The "uniq" prefix marks it as a name, not a number.  Flat
-; alternation so hbnf emits a single scanner, not a colliding [ PERIOD
-; 1*DIGIT ] sub-token pair.
+; a uuid is one token: "id" + digits, or "id" + digits.digits (the k-stack
+; minor).  The "id" prefix marks it as a name, not a number.  Flat alternation
+; so hbnf emits a single scanner, not a colliding [ PERIOD 1*DIGIT ] pair.
 uuid       = 'i' 'd' 1*DIGIT PERIOD 1*DIGIT
            | 'i' 'd' 1*DIGIT
-title      = ( SP | HTAB ) *title_char
-title_char = %x01-09 | %x0B-10FFFF        ; any code point except LF/CR
+; free text to end of line: it starts at a visible character (the blanks
+; before it are white space) and holds anything but LF and CR.
+title      = title_start *title_char
+title_start = %x21-10FFFF
+title_char = %x01-09 | %x0B-0C | %x0E-10FFFF
 
-; ── a directive value: free text to end of line, zero or more atoms ────
-value      = *( word | uuid | int | PIPE | title )
-
-; ── core types (char rules, suppress the built-in jets) ───────────────
-; word is letter-led only: the outline has no digit-led barewords (IPs, dotted
-; runs) — those are uuids, and the digit-led branch would tie with uuid's
-; `1*DIGIT [ PERIOD 1*DIGIT ]` on "10001.1" and win on declaration order.
-word = word_start *wordchars
-wordchars     = ALPHA | DIGIT | "_" | "-" | "."
-word_start    = ALPHA | "_" | "-"
-int  = 1*DIGIT | "-" 1*DIGIT
-str  = DQUOTE *str_char DQUOTE
-str_char = %x5C %x00-10FFFF | %x00-21 | %x23-5B | %x5D-10FFFF
-
-; ── whitespace: SP/HTAB/LF/CR/comment are skipped between entries ──────
-ws           = SP | HTAB | CR | LF | comment
+; -- white space: blanks, CR and comments are skipped between elements; the
+; line feed is not, it ends the line ------------------------------------------
+ws           = SP | HTAB | CR | comment
 comment      = "#" *comment_char
-comment_char = %x01-09 | %x0B-10FFFF
+comment_char = %x01-09 | %x0B-0C | %x0E-10FFFF

@@ -2,7 +2,7 @@
 --
 --  Run via `make check`: builds and runs ./tests.  Depends only on aunit; the
 --  buildabook engine units it exercises (Outline, Tokens, Materialize, Build)
---  do not pull in the book.conf reader, so hbnf is not required here.
+--  do not need hbnf (the parsers it generates are checked in).
 
 with "aunit";
 

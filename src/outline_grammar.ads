@@ -8,41 +8,34 @@ package Outline_Grammar is
    use Ada.Strings.Unbounded;
    use Interfaces;
 
-   -- ── the directive keyword set (render.py's DIRECTIVE_RE) ───────────────
-   type Name_Type is (Name_Label, Name_Number, Name_Count, Name_Default, Name_None);
+   subtype Bnf_value_Type is Unbounded_String;
 
-   -- ── custom tokens (declared before word/int/str so they win ties) ─────
-   subtype Prefix_Type is Unbounded_String;
+   -- -- the directive keyword set ---------------------------------------------
+   type Bnf_name_Type is (Bnf_name_Label, Bnf_name_Number, Bnf_name_Count, Bnf_name_Default, Bnf_name_None);
 
-   -- a uuid is one token: "uniq" + digits, or "uniq" + digits.digits (the k-stack
-   -- minor).  The "uniq" prefix marks it as a name, not a number.  Flat
-   -- alternation so hbnf emits a single scanner, not a colliding [ PERIOD
-   -- 1*DIGIT ] sub-token pair.
-   subtype Uuid_Type is Unbounded_String;
+   -- -- tokens ------------------------------------------------------------------
+   subtype Bnf_prefix_Type is Unbounded_String;
 
-   subtype Title_Type is Unbounded_String;
+   -- a uuid is one token: "id" + digits, or "id" + digits.digits (the k-stack
+   -- minor).  The "id" prefix marks it as a name, not a number.  Flat alternation
+   -- so hbnf emits a single scanner, not a colliding [ PERIOD 1*DIGIT ] pair.
+   subtype Bnf_uuid_Type is Unbounded_String;
 
-   subtype Title_char_Type is Unbounded_String;
- -- any code point except LF/CR
+   -- free text to end of line: it starts at a visible character (the blanks
+   -- before it are white space) and holds anything but LF and CR.
+   subtype Bnf_title_Type is Unbounded_String;
 
-   -- ── core types (char rules, suppress the built-in jets) ───────────────
-   -- word is letter-led only: the outline has no digit-led barewords (IPs, dotted
-   -- runs) — those are uuids, and the digit-led branch would tie with uuid's
-   -- `1*DIGIT [ PERIOD 1*DIGIT ]` on "10001.1" and win on declaration order.
-   subtype Word_Type is Unbounded_String;
+   subtype Bnf_title_start_Type is Unbounded_String;
 
-   subtype Wordchars_Type is Unbounded_String;
+   subtype Bnf_title_char_Type is Unbounded_String;
 
-   subtype Word_start_Type is Unbounded_String;
-
-   subtype Int_Type is Unbounded_String;
-
-   -- ── whitespace: SP/HTAB/LF/CR/comment are skipped between entries ──────
+   -- -- white space: blanks, CR and comments are skipped between elements; the
+   -- line feed is not, it ends the line ------------------------------------------
    subtype Ws_Type is Unbounded_String;
 
-   subtype Comment_Type is Unbounded_String;
+   subtype Bnf_comment_Type is Unbounded_String;
 
-   subtype Comment_char_Type is Unbounded_String;
+   subtype Bnf_comment_char_Type is Unbounded_String;
 
    -- common.hbnf — the character classes and core rules any grammar shares.
    -- 
@@ -51,84 +44,80 @@ package Outline_Grammar is
    -- named ASCII characters, so a grammar that includes this one file gets the
    -- whole set.
    -- --- RFC 5234 Appendix B.1 character classes (each matches one code point) ---
-   subtype DIGIT_Type is Unbounded_String;
+   subtype Bnf_DIGIT_Type is Unbounded_String;
 
-   subtype ALPHA_Type is Unbounded_String;
+   subtype Bnf_LF_Type is Unbounded_String;
 
-   subtype LF_Type is Unbounded_String;
-
-   subtype CR_Type is Unbounded_String;
+   subtype Bnf_CR_Type is Unbounded_String;
 
    -- --- blanks and DEL ---
-   subtype SP_Type is Unbounded_String;
+   subtype Bnf_SP_Type is Unbounded_String;
 
-   subtype HTAB_Type is Unbounded_String;
+   subtype Bnf_HTAB_Type is Unbounded_String;
 
-   subtype PERIOD_Type is Unbounded_String;
+   subtype Bnf_PERIOD_Type is Unbounded_String;
  -- .
 
-   subtype COLON_Type is Unbounded_String;
+   subtype Bnf_COLON_Type is Unbounded_String;
  -- :
 
-   subtype PIPE_Type is Unbounded_String;
- -- |
+   subtype Word_Type is Unbounded_String;
 
-   subtype Title_1_Type is Unbounded_String;
+   subtype Int_Type is Unbounded_String;
 
-   subtype Title_2_Type is Unbounded_String;
+   subtype Str_Type is Unbounded_String;
 
-   type Entry_Type;
-   type Content_Type;
-   type Directive_Type;
-   type Tail_Type;
+   subtype Bnf_content_1_Type is Unbounded_String;
 
-   type Entry_Access is access Entry_Type;
-   type Content_Access is access Content_Type;
-   type Directive_Access is access Directive_Type;
-   type Tail_Access is access Tail_Type;
+   subtype Bnf_eol_Type is Unbounded_String;
 
-   package Outline_Vectors is new Ada.Containers.Vectors
-     (Positive, Entry_Access);
-   subtype Outline_Type is Outline_Vectors.Vector;
+   type Bnf_line_Type;
+   type Bnf_entry_Type;
+   type Bnf_content_Type;
+   type Bnf_directive_Type;
+   type Bnf_tail_Type;
 
-   -- ── a directive value: free text to end of line, zero or more atoms ────
-   type Value_Entry is record
-      Word : Unbounded_String;
-      Uuid : Uuid_Type;
-      Int : Long_Long_Integer;
-      PIPE : PIPE_Type;
-      Title : Title_Type;
-   end record;
-   package Value_Vectors is new Ada.Containers.Vectors
-     (Positive, Value_Entry);
-   subtype Value_Type is Value_Vectors.Vector;
+   type Bnf_line_Access is access Bnf_line_Type;
+   type Bnf_entry_Access is access Bnf_entry_Type;
+   type Bnf_content_Access is access Bnf_content_Type;
+   type Bnf_directive_Access is access Bnf_directive_Type;
+   type Bnf_tail_Access is access Bnf_tail_Type;
 
-   package Content_1_Vectors is new Ada.Containers.Vectors
-     (Positive, Title_Type);
-   subtype Content_1_Type is Content_1_Vectors.Vector;
+   package Bnf_outline_Vectors is new Ada.Containers.Vectors
+     (Positive, Bnf_line_Access);
+   subtype Bnf_outline_Type is Bnf_outline_Vectors.Vector;
 
-   type Content_Type is record
-      Prefix : Prefix_Type;
-      COLON : COLON_Type;
-      Uuid : Uuid_Type;
-      Content_1 : Content_1_Type;
+   package Bnf_line_1_Vectors is new Ada.Containers.Vectors
+     (Positive, Bnf_entry_Access);
+   subtype Bnf_line_1_Type is Bnf_line_1_Vectors.Vector;
+
+   type Bnf_line_Type is record
+      Bnf_line_1 : Bnf_line_1_Type;
+      Bnf_eol : Bnf_eol_Type;
    end record;
 
-   type Tail_Type is record
-      Name : Name_Type;
-      COLON : COLON_Type;
-      Value : Value_Type;
+   type Bnf_content_Type is record
+      Bnf_prefix : Bnf_prefix_Type;
+      Bnf_COLON : Bnf_COLON_Type;
+      Bnf_uuid : Bnf_uuid_Type;
+      Bnf_content_1 : Bnf_content_1_Type;
    end record;
 
-   type Directive_Type is record
-      Prefix : Prefix_Type;
-      COLON : COLON_Type;
-      Tail : Tail_Access;
+   type Bnf_tail_Type is record
+      Bnf_name : Bnf_name_Type;
+      Bnf_COLON : Bnf_COLON_Type;
+      Bnf_value : Bnf_value_Type;
    end record;
 
-   type Entry_Type is record
-      Content : Content_Access;
-      Directive : Directive_Access;
+   type Bnf_directive_Type is record
+      Bnf_prefix : Bnf_prefix_Type;
+      Bnf_COLON : Bnf_COLON_Type;
+      Bnf_tail : Bnf_tail_Access;
+   end record;
+
+   type Bnf_entry_Type is record
+      Bnf_content : Bnf_content_Access;
+      Bnf_directive : Bnf_directive_Access;
    end record;
 
 end Outline_Grammar;

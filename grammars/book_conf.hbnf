@@ -1,0 +1,41 @@
+; book_conf.hbnf — book.conf, the per-book configuration, as an hbnf grammar.
+; obconf style: a directive is a bareword key followed by a value (a bareword,
+; a "quoted string" or an integer) or by a { } block of directives; `#` starts
+; a comment; an entry may end with `;` and a newline is white space.  Example:
+;
+;     title "Telegraph to Turbo Jet"
+;     author "David Walther"
+;     build {
+;         outline    outline.txt
+;         src        chapters
+;     }
+;
+; The tree is generic (a key, then a value or a block), so config.adb looks
+; the directives up by name and a new directive needs no change here.  The
+; lexer rules (int, word, str, comment, ws) are obconf's, copied rather than
+; included so the generated package holds only what book.conf needs.
+
+language Ada
+
+include "common.hbnf"
+
+whitespace ws
+
+book    = *( item )
+item    = key body [ ";" ]
+key     = word
+body    = block | value
+block   = "{" *( item ) "}"
+value   = word | str
+
+; -- the lexer: word and str are tokens; ws is matched and skipped.  A word is
+; any run of letters, digits, `_`, `-` and `.`, so a number such as 2026 or a
+; file name such as outline.txt is a word and keeps its text exactly (obconf
+; makes a bare integer a separate type; book.conf has no use for one).
+word          = 1*wordchars
+wordchars     = ALPHA | DIGIT | "_" | "-" | "."
+str           = DQUOTE *str_char DQUOTE
+str_char      = %x5C %x00-10FFFF | %x00-21 | %x23-5B | %x5D-10FFFF
+comment       = "#" *comment_char
+comment_char  = %x01-09 | %x0B-10FFFF
+ws            = SP | HTAB | CR | LF | comment

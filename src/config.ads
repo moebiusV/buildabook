@@ -1,5 +1,5 @@
---  config.ads — the per-book configuration (book.conf), parsed with hbnf's
---  HBNF_Config crate (the obconf-style grammar).  It supplies the metadata
+--  config.ads — the per-book configuration (book.conf), parsed by the parser
+--  hbnf generated from grammars/book_conf.hbnf (obconf style).  It supplies the metadata
 --  (title, author, slug) and the build/cover paths that the CLI falls back to
 --  when no command-line flag overrides them.
 --

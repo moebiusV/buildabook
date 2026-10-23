@@ -2,8 +2,9 @@
 #
 # GNU-style configure for an Ada 2022 project built with gprbuild.  There is
 # no AC_PROG_Ada, so the Ada toolchain is detected by hand (gprbuild + the
-# GNAT gcc) and the hbnf runtime project (libhbnf.a) is checked for gprbuild
-# visibility, since buildabook.gpr `with "hbnf_config"`.
+# GNAT gcc).  hbnf is not needed to build: the two parsers it generates
+# (src/outline_grammar*, src/book_conf_grammar*) are checked in; hbnf is only
+# needed to regenerate them (grammars/regen.sh).
 #
 #   ./configure && make && make check && make install
 #
@@ -56,16 +57,11 @@ AC_PATH_PROG([TYPST], [typst])
 AS_IF([test -z "$TYPST"],
       [AC_MSG_WARN([typst not found; `buildabook build` will not be able to compile the PDF])])
 
-# -- hbnf runtime -----------------------------------------------------------
-# buildabook links libhbnf.a (hbnf_config.gpr), which itself depends on
-# mustache.gpr.  Both must be gprbuild-visible (installed by the ada-on-alpine
-# hbnf + mustache-ada aports).  A `-c` dry pass is the reliable probe: a
-# missing project file aborts gprbuild before any compilation.
-AC_MSG_CHECKING([that hbnf_config.gpr and mustache.gpr are gprbuild-visible])
-AS_IF([$GPRBUILD -P "$srcdir/buildabook.gpr" -q -c >/dev/null 2>&1],
-      [AC_MSG_RESULT([yes])],
-      [AC_MSG_RESULT([no])
-       AC_MSG_ERROR([hbnf_config.gpr (and its mustache.gpr dependency) must be visible to gprbuild; install the ada-on-alpine hbnf + mustache-ada packages])])
+# -- hbnf (optional) ----------------------------------------------------------
+# Only grammars/regen.sh uses it, to regenerate the checked-in parsers.
+AC_PATH_PROG([HBNF], [hbnf])
+AS_IF([test -z "$HBNF"],
+      [AC_MSG_NOTICE([hbnf not found; fine for building, needed only for grammars/regen.sh])])
 
 # -- aunit (for `make check`) ------------------------------------------------
 # The test harness links aunit (tests/tests.gpr `with "aunit"`); it is needed

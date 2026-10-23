@@ -11,8 +11,8 @@ with Outline_Grammar.Parser;
 
 package body Outline is
 
-   use type Outline_Grammar.Content_Access;
-   use type Outline_Grammar.Directive_Access;
+   use type Outline_Grammar.Bnf_content_Access;
+   use type Outline_Grammar.Bnf_directive_Access;
 
    --  UTF-8 encoding of U+00A7 SECTION SIGN (§), written as explicit bytes so
    --  the source encoding can never turn it into a single Latin-1 byte.
@@ -143,7 +143,7 @@ package body Outline is
 
    -- ── prefix / kind ────────────────────────────────────────────────────────
 
-   function Prefix_Char (P : Outline_Grammar.Prefix_Type) return Character is
+   function Prefix_Char (P : Outline_Grammar.Bnf_prefix_Type) return Character is
       S : constant String := To_String (P);
    begin
       if S'Length /= 1 then
@@ -251,13 +251,13 @@ package body Outline is
    end Style_Of;
 
    procedure Apply_Directive
-     (St : in out State; Name : Outline_Grammar.Name_Type;
+     (St : in out State; Name : Outline_Grammar.Bnf_name_Type;
       Value : Unbounded_String) is
       V    : constant String := To_String (Value);
       Pipe : Natural;
    begin
       case Name is
-         when Outline_Grammar.Name_Label =>
+         when Outline_Grammar.Bnf_name_Label =>
             Pipe := Ada.Strings.Fixed.Index (V, "|");
             if Pipe /= 0 then
                St.Has_Label := True;
@@ -270,10 +270,10 @@ package body Outline is
                St.Has_Short := True;
                St.Short := Value;
             end if;
-         when Outline_Grammar.Name_Number =>
+         when Outline_Grammar.Bnf_name_Number =>
             St.Has_Number := True;
             St.Number := Style_Of (V);
-         when Outline_Grammar.Name_Count =>
+         when Outline_Grammar.Bnf_name_Count =>
             begin
                St.Next := Natural'Value (V);
                St.Has_Next := True;
@@ -282,7 +282,7 @@ package body Outline is
                   raise Outline_Error with
                     "count requires an integer, got '" & V & "'";
             end;
-         when Outline_Grammar.Name_Default =>
+         when Outline_Grammar.Bnf_name_Default =>
             if V = "label" then
                St.Has_Label := False;
                St.Has_Short := False;
@@ -299,7 +299,7 @@ package body Outline is
                raise Outline_Error with
                  "default takes label/number/count/title/toc, got '" & V & "'";
             end if;
-         when Outline_Grammar.Name_None =>
+         when Outline_Grammar.Bnf_name_None =>
             if V = "label" then
                St.Has_Label := True;
                St.Label := Null_Unbounded_String;
@@ -319,43 +319,23 @@ package body Outline is
       end case;
    end Apply_Directive;
 
-   -- ── the directive value: rebuild free text from the atom vector ─────────
+   -- ── the directive value: free text to end of line ───────────────────────
 
-   function Value_Text (V : Outline_Grammar.Value_Type) return Unbounded_String is
-      B : Unbounded_String;
+   function Value_Text (V : Outline_Grammar.Bnf_value_Type) return Unbounded_String is
    begin
-      for E of V loop
-         if Length (E.Word) > 0 then
-            Append (B, E.Word);
-         elsif Length (E.Uuid) > 0 then
-            Append (B, E.Uuid);
-         elsif Length (E.PIPE) > 0 then
-            Append (B, E.PIPE);
-         elsif Length (E.Title) > 0 then
-            Append (B, E.Title);
-         else
-            --  the int atom (a bare count value): all the string fields are
-            --  empty, so the only field set is the integer.
-            Append (B, Ada.Strings.Fixed.Trim
-              (Long_Long_Integer'Image (E.Int), Ada.Strings.Left));
-         end if;
-      end loop;
-      return B;
+      return V;
    end Value_Text;
 
-   function Title_Of (C : Outline_Grammar.Content_Type) return Unbounded_String is
-      T : Unbounded_String;
+   function Title_Of (C : Outline_Grammar.Bnf_content_Type) return Unbounded_String is
+      T : constant Unbounded_String := C.Bnf_content_1;
    begin
-      for X of C.Content_1 loop
-         Append (T, X);
-      end loop;
       return Strip (T);
    end Title_Of;
 
    -- ── Load ─────────────────────────────────────────────────────────────────
 
    function Load (Path : String) return Outline_Type is
-      Tree : Outline_Grammar.Outline_Type;
+      Tree : Outline_Grammar.Bnf_outline_Type;
       R    : Outline_Type;
 
       Sts        : State_Array;
@@ -376,26 +356,29 @@ package body Outline is
       end Add_Row;
 
    begin
-      Tree := Outline_Grammar.Parser.Parse_Text (Read_File (Path));
+      Tree := Outline_Grammar.Parser.Parse_Text (Read_File (Path) & ASCII.LF);
 
+      --  a line is an entry or nothing (a blank or comment line); the file text
+      --  gets a final LF so that a last line without one parses
       for I in 1 .. Natural (Tree.Length) loop
+       for J in 1 .. Natural (Tree (I).Bnf_line_1.Length) loop
          declare
-            EG : Outline_Grammar.Entry_Type renames Tree (I).all;
+            EG : Outline_Grammar.Bnf_entry_Type renames Tree (I).Bnf_line_1 (J).all;
          begin
-            if EG.Directive /= null then
+            if EG.Bnf_directive /= null then
                declare
-                  D : Outline_Grammar.Directive_Type renames EG.Directive.all;
+                  D : Outline_Grammar.Bnf_directive_Type renames EG.Bnf_directive.all;
                begin
                   Apply_Directive
-                    (Sts (Prefix_Id_Of (Prefix_Char (D.Prefix))),
-                     D.Tail.all.Name, Strip (Value_Text (D.Tail.all.Value)));
+                    (Sts (Prefix_Id_Of (Prefix_Char (D.Bnf_prefix))),
+                     D.Bnf_tail.all.Bnf_name, Strip (Value_Text (D.Bnf_tail.all.Bnf_value)));
                end;
-            elsif EG.Content /= null then
+            elsif EG.Bnf_content /= null then
                declare
-                  C    : Outline_Grammar.Content_Type renames EG.Content.all;
-                  Ch   : constant Character := Prefix_Char (C.Prefix);
+                  C    : Outline_Grammar.Bnf_content_Type renames EG.Bnf_content.all;
+                  Ch   : constant Character := Prefix_Char (C.Bnf_prefix);
                   Kid  : constant Kind := Kind_Of (Ch);
-                  Uuid : constant String := To_String (C.Uuid);
+                  Uuid : constant String := To_String (C.Bnf_uuid);
                   St   : State renames Sts (Prefix_Id_Of (Ch));
 
                   E     : Row;
@@ -500,6 +483,7 @@ package body Outline is
                end;
             end if;
          end;
+       end loop;
       end loop;
 
       return R;

@@ -2,12 +2,16 @@ buildabook — installation
 
 Prerequisites
 -------------
-An Ada 2022 toolchain with the ada-on-alpine packages installed:
+An Ada 2022 toolchain:
 
-    gcc-gnat 15.x   gprbuild   hbnf   (hbnf pulls in mustache-ada transitively)
+    gcc-gnat 15.x   gprbuild
 
-The canonical way to get these is the ada-toolchain:edge container image
-(built by the ada-on-alpine overlay).  See build.sh.
+(hbnf is not needed to build: the two parsers it generates are checked in.  It
+is needed only to regenerate them, with grammars/regen.sh; use hbnf at or
+after 0.7.0, the moebiusV/hbnf main branch of 2026-10-22 or later.)
+
+The ada-toolchain:edge container image (built by the ada-on-alpine overlay)
+has all of these.  See build.sh.
 
 Building from a release tarball
 -------------------------------
