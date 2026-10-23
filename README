@@ -72,19 +72,19 @@ The input language is specified in `LANGUAGE.md`.
 Building
 --------
 
-buildabook is Ada 2022, built with gprbuild, and links the hbnf runtime
-(`hbnf_config.gpr`, which pulls in mustache-ada transitively). The canonical
-toolchain is the ada-on-alpine overlay, packaged as the `ada-toolchain:edge`
-container image.
+buildabook is Ada 2022, built with gprbuild. It does not need hbnf to build:
+the two parsers hbnf generates (the outline and `book.conf`, from
+`grammars/*.hbnf`) are checked in, and `grammars/regen.sh` regenerates them
+with hbnf 0.7.0 or later. The canonical toolchain is the ada-on-alpine overlay,
+packaged as the `ada-toolchain:edge` container image.
 
     ./configure
     make
     make check        # the aunit suite
     make install      # installs buildabook and its man page
 
-`configure` checks for gprbuild, the GNAT compiler, and that the hbnf and
-mustache-ada projects are gprbuild-visible (and that aunit is visible, for
-`make check`). `build.sh` wraps the whole build in the container if you prefer
+`configure` checks for gprbuild and the GNAT compiler (and that aunit is
+visible, for `make check`; hbnf is optional, for `grammars/regen.sh`). `build.sh` wraps the whole build in the container if you prefer
 that to a host toolchain.
 
 Usage
