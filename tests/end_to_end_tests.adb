@@ -173,6 +173,16 @@ package body End_To_End_Tests is
         "Last-Modified: 2026-01-02" & ASCII.LF &
         "Output-Formats: " & ASCII.LF &
         "Tagline: First." & ASCII.LF);
+      --  a document that is not part of the book (not in the filemap): jacket copy
+      Files.Write (Rdir & "/chapters/blurb.md", "Copy." & ASCII.LF);
+      Files.Write (Rdir & "/chapters/blurb.md.desc",
+        "Title: Blurb" & ASCII.LF &
+        "Creation-Date: 2026-01-01" & ASCII.LF &
+        "Last-Modified: 2026-01-02" & ASCII.LF &
+        "Output-Formats: " & ASCII.LF &
+        "Tagline: Short." & ASCII.LF);
+      Files.Write (Rdir & "/filemap.txt",
+        "# comment" & ASCII.LF & ASCII.LF & "id00001:ch01.md" & ASCII.LF);
 
       Ada.Directories.Set_Directory (Rdir);
       begin
@@ -190,12 +200,15 @@ package body End_To_End_Tests is
          end;
 
          Files.Write ("fixture.html", "<html></html>");
-         Readme.Write_Readme ("DESCRIPTION.md", "chapters", "fixture", "README.md");
+         Readme.Write_Readme
+           ("DESCRIPTION.md", "chapters", "fixture", "README.md", "filemap.txt");
          declare
             R : constant String := Files.Read ("README.md");
          begin
-            Assert (Ada.Strings.Fixed.Index (R, "(fixture.html#ch01)") /= 0,
+            Assert (Ada.Strings.Fixed.Index (R, "(fixture.html#ch-ch01)") /= 0,
                     "html file: the contents link to the chapter in the page");
+            Assert (Ada.Strings.Fixed.Index (R, "(chapters/blurb.md)") /= 0,
+                    "html file: a document outside the book keeps its source link");
             Assert (Ada.Strings.Fixed.Index (R, "| HTML | [fixture.html](fixture.html)") /= 0,
                     "html file: the download table has an HTML row");
          end;

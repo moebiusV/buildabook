@@ -6,4 +6,4 @@ buildabook NEWS — user-visible changes
   * buildabook html: render with an HTML template (book.html.typ, default in
     template/) and compile with Typst's HTML export to <slug>.html.
   * buildabook readme: with <slug>.html present, add an HTML row and link the
-    contents to the chapters in that page.
+    contents of the book (the files of filemap.txt) to the chapters in that page.

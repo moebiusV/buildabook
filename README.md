@@ -169,8 +169,9 @@ calls such as `align`, `pad` and `v()` together with their contents. It renders
 the same chapters with the same numbers as the PDF, to `rendered/book-html.typ`,
 and compiles that with `typst compile --features html --format html` to one HTML
 file. Typst calls its HTML export experimental, so it needs a recent typst-cli
-(0.13 or later). Each chapter heading's id is its file name without `.md`, and
-once `<slug>.html` exists `buildabook readme` links the contents to those ids.
+(0.13 or later). Each chapter heading's id is `ch-` and its file name without `.md`, and
+once `<slug>.html` exists `buildabook readme` links the contents of the book to
+those ids.
 
 Limitations
 -----------

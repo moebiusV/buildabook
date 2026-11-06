@@ -168,7 +168,8 @@ package body Readme is
      (Description_Path : String;
       Src_Dir          : String;
       Slug             : String;
-      Out_Path         : String)
+      Out_Path         : String;
+      Filemap          : String := "")
    is
       Book    : Meta;
       Md      : Str_Sets.Set;
@@ -189,6 +190,51 @@ package body Readme is
          end if;
          return File;
       end Stem;
+
+      --  the id the HTML template gives a chapter's heading: "ch-" and the stem,
+      --  as an HTML id (an id of Typst's must not start with a digit)
+      function Anchor (File : String) return String is
+         R : String := Stem (File);
+      begin
+         for I in R'Range loop
+            if R (I) not in 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '-' then
+               R (I) := '-';
+            end if;
+         end loop;
+         return "ch-" & R;
+      end Anchor;
+
+      --  the files of the book (UUID:filename lines of the filemap); with no filemap
+      --  every entry is taken to be in it
+      Book_Files : Str_Sets.Set;
+      Have_Map   : Boolean := False;
+
+      procedure Read_Book_Files is
+         Text  : constant String := Files.Read (Filemap);
+         Start : Natural := Text'First;
+      begin
+         Have_Map := True;
+         for I in Text'First .. Text'Last + 1 loop
+            if I > Text'Last or else Text (I) = ASCII.LF then
+               declare
+                  Ln : constant String := Text (Start .. I - 1);
+                  C  : constant Natural := Ada.Strings.Fixed.Index (Ln, ":");
+               begin
+                  if Ln'Length > 0 and then Ln (Ln'First) /= '#' and then C > 0 then
+                     declare
+                        Name : constant String :=
+                          Ada.Strings.Fixed.Trim (Ln (C + 1 .. Ln'Last), Ada.Strings.Both);
+                     begin
+                        if Name /= "" then
+                           Book_Files.Include (Name);
+                        end if;
+                     end;
+                  end if;
+               end;
+               Start := I + 1;
+            end if;
+         end loop;
+      end Read_Book_Files;
 
       procedure Line (S : String) is
       begin
@@ -236,6 +282,10 @@ package body Readme is
          end;
       end loop;
 
+      if Has_Html and then Filemap /= "" and then Ada.Directories.Exists (Filemap) then
+         Read_Book_Files;
+      end if;
+
       --  Header
       Line ("# " & To_String (Book.Title));
       Blank;
@@ -272,9 +322,11 @@ package body Readme is
          declare
             E : Chapter renames Entries (I);
          begin
-            if Has_Html then
+            if Has_Html
+              and then (not Have_Map or else Book_Files.Contains (To_String (E.File)))
+            then
                Line ("**[" & To_String (E.Title) & "](" & Html_Name & "#"
-                 & Stem (To_String (E.File)) & ")** — " & To_String (E.Tagline));
+                 & Anchor (To_String (E.File)) & ")** — " & To_String (E.Tagline));
             else
                Line ("**[" & To_String (E.Title) & "](" & Src_Dir & "/"
                  & To_String (E.File) & ")** — " & To_String (E.Tagline));

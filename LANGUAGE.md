@@ -245,7 +245,10 @@ to a page: define `book-title`, `chapter(path, token, part, toc)`, `pgan(id)` an
 link to the anchor `pgan` plants rather than print a number.  Typst's HTML export
 drops `align`, `pad`, `grid`, `line`, `v`, `pagebreak` and `set page` (with their
 contents, for the first four), so the template builds the page with `html.elem`
-and its own CSS.  The default is `template/book.html.typ`.
+and its own CSS.  The default is `template/book.html.typ`.  A chapter's heading gets
+the id `ch-` plus its file name without `.md` (anything but letters, digits, `_` and
+`-` turned into `-`); Typst writes a label as an id only when it is a plain identifier,
+so the id cannot start with a digit.  `buildabook readme` links to the same ids.
 
 ---
 

@@ -13,7 +13,7 @@
 //    book-title   chapter(path, token, part, toc)   pgan(id)   pageof(id)
 //  and import cmarker's `render`.  Keep the metadata in step with the paged
 //  template.  The output is one HTML file; each chapter's heading has the id
-//  of its file name without ".md", so a link can go straight to a chapter.
+//  "ch-" plus its file name without ".md", so a link can go straight to a chapter.
 // -------------------------------------------------------------------
 
 #import "@preview/cmarker:0.1.1": render
@@ -128,8 +128,10 @@
 
 // buildabook generates one call per outline entry:
 //   #chapter("file.md", token: "c:id00042", part: false, toc: true)
-// Parts are headings one level above chapters.  The heading's id is the file name
-// without ".md".
+// Parts are headings one level above chapters.  The heading's id is "ch-" and the file
+// name without ".md" (anything but letters, digits, "_" and "-" becomes "-"): Typst only
+// writes a label as an id when it is a plain identifier, so it cannot start with a digit.
+// buildabook readme uses the same rule for its links.
 #let chapter(path, token: none, part: false, toc: true) = {
   let src        = read(path)
   let preamble   = md-preamble(src)
@@ -141,8 +143,9 @@
   }
 
   let stem  = if path.ends-with(".md") { path.slice(0, path.len() - 3) } else { path }
+  let id    = "ch-" + stem.replace(regex("[^A-Za-z0-9_-]"), "-")
   let level = if part { 1 } else { 2 }
-  [#heading(level: level, outlined: toc, numbering: none)[#full-title]#label(stem)]
+  [#heading(level: level, outlined: toc, numbering: none)[#full-title]#label(id)]
 
   if token != none {
     pgan(token.split(":").last())

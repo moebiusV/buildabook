@@ -513,7 +513,8 @@ procedure Buildabook_Cli is
    begin
       begin
          Readme.Write_Readme
-           (Description, To_String (C.Src), To_String (C.Slug), Readme_Out);
+           (Description, To_String (C.Src), To_String (C.Slug), Readme_Out,
+            To_String (C.Filemap));
       exception
          when E : Readme.Readme_Error =>
             Err (Ada.Exceptions.Exception_Message (E));
