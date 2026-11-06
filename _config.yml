@@ -1,0 +1,16 @@
+# GitHub Pages (https://moebiusv.github.io/buildabook/): the front page is the README itself, pulled in by index.md.
+title: buildabook
+description: Build a printable book from Markdown and Typst files, with cover, table of contents, and footnotes
+theme: jekyll-theme-minimal
+exclude:
+  - tests
+  - src
+  - build-aux
+  - githooks
+  - grammars
+  - template
+  - autom4te.cache
+  - "*.gpr"
+  - "*.in"
+  - configure.ac
+  - build.sh
