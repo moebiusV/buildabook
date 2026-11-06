@@ -1,0 +1,15 @@
+#!/bin/sh
+# pre-commit - keep index.html, the GitHub Pages front page, in step with README.md.
+# When README.md is part of the commit, rebuild index.html with pages.sh and add it.
+# pages.sh needs a built hbnf (HBNF_DIR, default ../hbnf); without one the commit
+# is refused rather than leaving the page stale (git commit --no-verify skips this).
+
+git diff --cached --quiet -- README.md && exit 0       # README.md is not in this commit
+
+root=$(git rev-parse --show-toplevel) || exit 1
+if ! sh "$root/pages.sh" >/dev/null; then
+    echo >&2 "pre-commit: pages.sh failed, so index.html was not rebuilt."
+    echo >&2 "Point HBNF_DIR at a built hbnf checkout, or commit with --no-verify."
+    exit 1
+fi
+git add -- "$root/index.html"
