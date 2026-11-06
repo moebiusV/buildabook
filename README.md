@@ -190,10 +190,6 @@ or mention Claude or Anthropic. Enable them in a clone with:
 
     make install-hooks        # or: git config core.hooksPath githooks
 
-The same directory has a `pre-commit` hook that rebuilds `index.html`, the
-GitHub Pages front page, whenever `README.md` is in the commit. It needs a built
-hbnf checkout (`HBNF_DIR`, default `../hbnf`); see `pages.sh`.
-
 Copying
 -------
 

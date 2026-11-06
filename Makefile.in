@@ -39,7 +39,7 @@ PROJECT    = buildabook.gpr
 BIN        = buildabook
 MANPAGE    = man/buildabook.1
 HOOKS_DIR  = githooks
-HOOKS      = commit-msg applypatch-msg pre-push pre-commit
+HOOKS      = commit-msg applypatch-msg pre-push
 
 # A GNAT project file is the one true build description; make just drives it.
 all: $(BIN)
@@ -64,7 +64,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN)"
 	rm -f "$(DESTDIR)$(man1dir)/$(BIN).1"
 
-# Copy the git hooks into .git/hooks (and enable nothing else): three de-claude hooks and the pre-commit that rebuilds index.html.
+# Copy the three de-claude git hooks into .git/hooks (and enable nothing else).
 install-hooks:
 	$(INSTALL) -d .git/hooks
 	for h in $(HOOKS); do \
