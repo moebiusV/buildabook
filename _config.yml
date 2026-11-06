@@ -4,6 +4,7 @@ description: Build a printable book from Markdown and Typst files, with cover, t
 theme: jekyll-theme-minimal
 exclude:
   - tests
+  - LANGUAGE.md
   - src
   - build-aux
   - githooks
