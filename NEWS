@@ -3,3 +3,7 @@ buildabook NEWS — user-visible changes
 0.1.0  (unreleased)
   * Initial release: outline-language book builder extracted from the three
     book projects (recheboc, speedrun, viking-poets) into one Ada program.
+  * buildabook html: render with an HTML template (book.html.typ, default in
+    template/) and compile with Typst's HTML export to <slug>.html.
+  * buildabook readme: with <slug>.html present, add an HTML row and link the
+    contents to the chapters in that page.

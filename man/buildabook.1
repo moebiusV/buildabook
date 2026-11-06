@@ -53,6 +53,22 @@ Compile
 .IR rendered/book.typ
 to the book PDF with Typst.
 .TP
+.B html
+Render the book with the HTML template
+.RI ( book.html.typ ,
+or
+.B html-template
+in the build block of
+.IR book.conf )
+to
+.IR rendered/book-html.typ ,
+using the same chapters and numbering as the PDF, and compile that with
+.B typst compile --features html --format html
+to one HTML file,
+.IR <slug>.html .
+Typst's HTML export is experimental and needs a recent
+.BR typst (1).
+.TP
 .B cover
 Update the cover spine width from the book PDF's page count (via
 .BR pdfinfo (1)),
@@ -134,6 +150,17 @@ Book slug used to derive output names (default: the directory name).
 .BI \-\-pdf " file"
 Book PDF output (default
 .IR <slug> .pdf).
+.TP
+.BI \-\-html " file"
+Book HTML output (default
+.IR <slug> .html).
+.TP
+.BI \-\-html-template " file"
+Typst template for the html stage (default
+.IR book.html.typ ,
+if present; the shared
+.I template/book.html.typ
+is the one to copy).
 .TP
 .BI \-\-cover-src " file"
 Cover source (default

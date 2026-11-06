@@ -94,6 +94,7 @@ Usage
     buildabook               typst -> pdf -> cover, building what it can
     buildabook typst         render rendered/book.typ + number_map.csv
     buildabook pdf           compile rendered/book.typ with Typst
+    buildabook html          render with the HTML template, compile to <slug>.html
     buildabook cover         update the cover spine, compile cover.typ
     buildabook check         validate outline, filemap, and tokens; emit nothing
     buildabook number-map    write number_map.csv only
@@ -160,6 +161,16 @@ override it. The coupling contract an override must honour is documented in
 `LANGUAGE.md`: define `book-title`, `running-title`, `fm-pages`, `body-pages`,
 `chapter(path, token, part, toc)`, `pgan(id)`, `pageof(id)`, and import
 cmarker.
+
+`buildabook html` uses a second template, `book.html.typ` beside `book.conf` (or
+`html-template` in the `build` block; `template/book.html.typ` is the default to
+copy). It is written in HTML elements, because Typst's HTML export drops layout
+calls such as `align`, `pad` and `v()` together with their contents. It renders
+the same chapters with the same numbers as the PDF, to `rendered/book-html.typ`,
+and compiles that with `typst compile --features html --format html` to one HTML
+file. Typst calls its HTML export experimental, so it needs a recent typst-cli
+(0.13 or later). Each chapter heading's id is its file name without `.md`, and
+once `<slug>.html` exists `buildabook readme` links the contents to those ids.
 
 Limitations
 -----------

@@ -339,7 +339,8 @@ package body Build is
       Filemap_Path  : String;
       Template_Path : String;
       Out_Dir       : String;
-      Number_Map    : String) return Materialize.Error_List is
+      Number_Map    : String;
+      Book_Name     : String := "book.typ") return Materialize.Error_List is
 
       O  : Outline.Outline_Type;
       R  : Tokens.Resolver;
@@ -411,7 +412,7 @@ package body Build is
          raise Build_Error with
            "missing " & Template_Path & " (the Typst template is required)";
       end if;
-      Emit.Write_Book_Typ (O, FM, Template_Path, Ada.Directories.Compose (Out_Dir, "book.typ"));
+      Emit.Write_Book_Typ (O, FM, Template_Path, Ada.Directories.Compose (Out_Dir, Book_Name));
 
       return Errors;
    end Render;

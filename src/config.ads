@@ -15,6 +15,7 @@
 --          src        chapters
 --          out        rendered
 --          template   book.header.typ
+--          html-template book.html.typ    (optional, for `buildabook html`)
 --          number-map number_map.csv
 --      }
 --
@@ -47,6 +48,7 @@ package Config is
       Src        : Unbounded_String;
       Out_Dir    : Unbounded_String;
       Template   : Unbounded_String;
+      Html_Template : Unbounded_String;   --  optional: the template for `buildabook html`
       Number_Map : Unbounded_String;
 
       --  the cover block

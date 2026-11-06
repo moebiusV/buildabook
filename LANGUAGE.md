@@ -236,6 +236,17 @@ TOC and before the body-page switch (`#show: body-pages`); the engine replaces
 that marker with the front-matter chapter calls.  Templates without front
 matter simply omit the marker.
 
+`buildabook html` takes a second template, `book.html.typ` (or `html-template`
+in the `build` block of `book.conf`), through the same engine: the chapters and
+tokens are resolved as for the PDF and the result is written to
+`rendered/book-html.typ`.  Its contract is the part of the one above that applies
+to a page: define `book-title`, `chapter(path, token, part, toc)`, `pgan(id)` and
+`pageof(id)`, and import cmarker.  There are no pages in HTML, so `pageof` should
+link to the anchor `pgan` plants rather than print a number.  Typst's HTML export
+drops `align`, `pad`, `grid`, `line`, `v`, `pagebreak` and `set page` (with their
+contents, for the first four), so the template builds the page with `html.elem`
+and its own CSS.  The default is `template/book.html.typ`.
+
 ---
 
 ## Example

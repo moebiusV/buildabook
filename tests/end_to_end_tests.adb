@@ -11,6 +11,7 @@ with Ada.Strings.Unbounded;
 with Build;
 with Files;
 with Materialize;
+with Readme;
 
 package body End_To_End_Tests is
 
@@ -118,6 +119,94 @@ package body End_To_End_Tests is
       Assert (Natural (Errors.Length) = 1, "the bad token is reported");
    end Test_Check;
 
+   --  The HTML stage renders with its own template into book-html.typ and leaves book.typ
+   --  (the paged book) alone; the chapters and tokens are the same.
+   procedure Test_Render_Html_Name (T : in out Test_Case'Class) is
+      pragma Unreferenced (T);
+      Errors : Materialize.Error_List;
+   begin
+      Write_Fixture;
+      Files.Write (Dir & "/book.html.typ",
+        "// test html template" & ASCII.LF &
+        "#let book-title = ""Fixture""" & ASCII.LF);
+
+      Errors := Build.Render
+        (Dir & "/outline.txt", Dir & "/chapters", Dir & "/filemap.txt",
+         Dir & "/book.html.typ", Dir & "/rendered-html", Dir & "/number_map.csv",
+         "book-html.typ");
+
+      Assert (Natural (Errors.Length) = 0, "no resolution errors");
+      Assert (Ada.Directories.Exists (Dir & "/rendered-html/book-html.typ"),
+              "book-html.typ is written");
+      Assert (not Ada.Directories.Exists (Dir & "/rendered-html/book.typ"),
+              "book.typ is not written by the html render");
+      Assert (Ada.Strings.Fixed.Index
+                (Files.Read (Dir & "/rendered-html/book-html.typ"),
+                 "// test html template") /= 0,
+              "book-html.typ starts with the html template");
+      Assert (Ada.Strings.Fixed.Index
+                (Files.Read (Dir & "/rendered-html/book-html.typ"),
+                 "#chapter(""ch01.md"", token: ""c:id00001"")") /= 0,
+              "book-html.typ lists the chapter call");
+      Assert (Ada.Strings.Fixed.Index
+                (Files.Read (Dir & "/rendered-html/ch01.md"), "Chapter 2") /= 0,
+              "the chapter text has its cross-reference resolved");
+   end Test_Render_Html_Name;
+
+   --  buildabook readme links the contents to the Markdown sources, and to the chapters of
+   --  <slug>.html (by file name without ".md") once that file exists beside the readme.
+   procedure Test_Readme_Links (T : in out Test_Case'Class) is
+      pragma Unreferenced (T);
+      Rdir : constant String := "/tmp/bba-readme";
+      Home : constant String := Ada.Directories.Current_Directory;
+   begin
+      Ada.Directories.Create_Path (Rdir & "/chapters");
+      Files.Write (Rdir & "/DESCRIPTION.md",
+        "Title: Fixture Book" & ASCII.LF &
+        "Tagline: A test" & ASCII.LF &
+        "Creation-Date: 2026-01-01" & ASCII.LF & ASCII.LF &
+        "Prose." & ASCII.LF);
+      Files.Write (Rdir & "/chapters/ch01.md", "# One" & ASCII.LF);
+      Files.Write (Rdir & "/chapters/ch01.md.desc",
+        "Title: Chapter One" & ASCII.LF &
+        "Creation-Date: 2026-01-01" & ASCII.LF &
+        "Last-Modified: 2026-01-02" & ASCII.LF &
+        "Output-Formats: " & ASCII.LF &
+        "Tagline: First." & ASCII.LF);
+
+      Ada.Directories.Set_Directory (Rdir);
+      begin
+         if Ada.Directories.Exists ("fixture.html") then
+            Ada.Directories.Delete_File ("fixture.html");
+         end if;
+         Readme.Write_Readme ("DESCRIPTION.md", "chapters", "fixture", "README.md");
+         declare
+            R : constant String := Files.Read ("README.md");
+         begin
+            Assert (Ada.Strings.Fixed.Index (R, "(chapters/ch01.md)") /= 0,
+                    "no html file: the contents link to the Markdown source");
+            Assert (Ada.Strings.Fixed.Index (R, "| HTML |") = 0,
+                    "no html file: no HTML row");
+         end;
+
+         Files.Write ("fixture.html", "<html></html>");
+         Readme.Write_Readme ("DESCRIPTION.md", "chapters", "fixture", "README.md");
+         declare
+            R : constant String := Files.Read ("README.md");
+         begin
+            Assert (Ada.Strings.Fixed.Index (R, "(fixture.html#ch01)") /= 0,
+                    "html file: the contents link to the chapter in the page");
+            Assert (Ada.Strings.Fixed.Index (R, "| HTML | [fixture.html](fixture.html)") /= 0,
+                    "html file: the download table has an HTML row");
+         end;
+      exception
+         when others =>
+            Ada.Directories.Set_Directory (Home);
+            raise;
+      end;
+      Ada.Directories.Set_Directory (Home);
+   end Test_Readme_Links;
+
    function Name (T : Test) return Message_String is
       pragma Unreferenced (T);
    begin
@@ -128,6 +217,10 @@ package body End_To_End_Tests is
    begin
       Registration.Register_Routine (T, Test_Render'Access, "render a fixture book");
       Registration.Register_Routine (T, Test_Check'Access, "check a fixture book");
+      Registration.Register_Routine
+        (T, Test_Render_Html_Name'Access, "render with the html template into book-html.typ");
+      Registration.Register_Routine
+        (T, Test_Readme_Links'Access, "readme links to the html chapters when the html exists");
    end Register_Tests;
 
    function Suite return Access_Test_Suite is

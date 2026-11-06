@@ -176,6 +176,20 @@ package body Readme is
       Out_Buf : Unbounded_String;
       Max_Mod : Unbounded_String := Null_Unbounded_String;
 
+      --  A book with an HTML build (<slug>.html beside the readme) links its
+      --  contents to the chapters in that page, whose ids are the chapter file
+      --  names without ".md"; without one the links go to the Markdown sources.
+      Html_Name : constant String := Slug & ".html";
+      Has_Html  : constant Boolean := Ada.Directories.Exists (Html_Name);
+
+      function Stem (File : String) return String is
+      begin
+         if File'Length > 3 and then File (File'Last - 2 .. File'Last) = ".md" then
+            return File (File'First .. File'Last - 3);
+         end if;
+         return File;
+      end Stem;
+
       procedure Line (S : String) is
       begin
          Append (Out_Buf, S);
@@ -245,6 +259,10 @@ package body Readme is
       Line ("|---|---|---|---|");
       Line ("| PDF | [" & Slug & ".pdf](" & Slug & ".pdf) | "
         & To_String (Book.Creation) & " | " & To_String (Max_Mod) & " |");
+      if Has_Html then
+         Line ("| HTML | [" & Html_Name & "](" & Html_Name & ") | "
+           & To_String (Book.Creation) & " | " & To_String (Max_Mod) & " |");
+      end if;
       Blank;
 
       --  Contents
@@ -254,8 +272,13 @@ package body Readme is
          declare
             E : Chapter renames Entries (I);
          begin
-            Line ("**[" & To_String (E.Title) & "](" & Src_Dir & "/"
-              & To_String (E.File) & ")** — " & To_String (E.Tagline));
+            if Has_Html then
+               Line ("**[" & To_String (E.Title) & "](" & Html_Name & "#"
+                 & Stem (To_String (E.File)) & ")** — " & To_String (E.Tagline));
+            else
+               Line ("**[" & To_String (E.Title) & "](" & Src_Dir & "/"
+                 & To_String (E.File) & ")** — " & To_String (E.Tagline));
+            end if;
             Blank;
             Line ("<small>Created: " & To_String (E.Creation)
               & " · Updated: " & To_String (E.Modified) & "</small>");

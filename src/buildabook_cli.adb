@@ -36,9 +36,11 @@ procedure Buildabook_Cli is
       Out_Dir    : Unbounded_String;
       Filemap    : Unbounded_String;   -- "" = none
       Template   : Unbounded_String;
+      Html_Template : Unbounded_String;
       Number_Map : Unbounded_String;
       Slug       : Unbounded_String;
       Pdf        : Unbounded_String;
+      Html       : Unbounded_String;
       Cover_Src  : Unbounded_String;
       Cover_Out  : Unbounded_String;
    end record;
@@ -86,7 +88,7 @@ procedure Buildabook_Cli is
       return False;
    end Has_Flag;
 
-   type Stage is (S_Typst, S_Pdf, S_Cover, S_Check, S_Number_Map, S_Uuid, S_Readme, S_All);
+   type Stage is (S_Typst, S_Pdf, S_Html, S_Cover, S_Check, S_Number_Map, S_Uuid, S_Readme, S_All);
 
    function Subcommand return Stage is
    begin
@@ -98,6 +100,8 @@ procedure Buildabook_Cli is
                return S_Typst;
             elsif A = "pdf" then
                return S_Pdf;
+            elsif A = "html" then
+               return S_Html;
             elsif A = "cover" then
                return S_Cover;
             elsif A = "check" then
@@ -123,6 +127,14 @@ procedure Buildabook_Cli is
       end if;
       return "";
    end Detect_Template;
+
+   function Detect_Html_Template return String is
+   begin
+      if Ada.Directories.Exists ("book.html.typ") then
+         return "book.html.typ";
+      end if;
+      return "";
+   end Detect_Html_Template;
 
    function Load_Config return Run_Config is
       Slug_Default : constant String :=
@@ -157,10 +169,14 @@ procedure Buildabook_Cli is
                              then "filemap.txt" else ""))),
          Template   => To_Unbounded_String
                          (V ("template", To_String (Cfg.Template), Detect_Template)),
+         Html_Template => To_Unbounded_String
+                         (V ("html-template", To_String (Cfg.Html_Template),
+                             Detect_Html_Template)),
          Number_Map => To_Unbounded_String
                          (V ("number-map", To_String (Cfg.Number_Map), "number_map.csv")),
          Slug       => To_Unbounded_String (Slug),
          Pdf        => To_Unbounded_String (V ("pdf", "", Slug & ".pdf")),
+         Html       => To_Unbounded_String (V ("html", "", Slug & ".html")),
          Cover_Src  => To_Unbounded_String
                          (V ("cover-src", To_String (Cfg.Cover_Src), "cover.typ")),
          Cover_Out  => To_Unbounded_String
@@ -188,11 +204,12 @@ procedure Buildabook_Cli is
    begin
       Put_Line ("buildabook — the outline-language book builder");
       New_Line;
-      Put_Line ("Usage: buildabook [typst|pdf|cover] [options]");
+      Put_Line ("Usage: buildabook [typst|pdf|html|cover] [options]");
       New_Line;
       Put_Line ("With no subcommand, build all three stages in order:");
       Put_Line ("  typst       render rendered/book.typ + number_map.csv from outline.txt");
       Put_Line ("  pdf         compile rendered/book.typ to a PDF");
+      Put_Line ("  html        render the book with the HTML template and compile it to one HTML file");
       Put_Line ("  cover       update the cover spine and compile cover.typ");
       Put_Line ("  check       validate outline + filemap + tokens, emit nothing");
       Put_Line ("  number-map  write number_map.csv only");
@@ -210,9 +227,11 @@ procedure Buildabook_Cli is
       Put_Line ("  --out DIR           render output directory (default rendered)");
       Put_Line ("  --filemap PATH      UUID:filename map (default filemap.txt if present)");
       Put_Line ("  --template PATH     Typst template (default book.header.typ or book.prefix.typ)");
+      Put_Line ("  --html-template PATH  Typst template for html (default book.html.typ)");
       Put_Line ("  --number-map PATH   CSV audit output (default number_map.csv)");
       Put_Line ("  --slug NAME         book slug for output names (default: directory name)");
       Put_Line ("  --pdf PATH          book PDF output (default <slug>.pdf)");
+      Put_Line ("  --html PATH         book HTML output (default <slug>.html)");
       Put_Line ("  --cover-src PATH    cover source (default cover.typ)");
       Put_Line ("  --cover PATH        cover PDF output (default <slug>-cover.pdf)");
       Put_Line ("  --description PATH  book header for the readme (default DESCRIPTION.md)");
@@ -292,6 +311,66 @@ procedure Buildabook_Cli is
       Msg ("built " & To_String (C.Pdf));
       Ok := True;
    end Run_Pdf;
+
+   procedure Run_Html (C : Run_Config; Ok : out Boolean) is
+      Errors   : Materialize.Error_List;
+      Book_Typ : constant String := To_String (C.Out_Dir) & "/book-html.typ";
+   begin
+      if To_String (C.Html_Template) = "" then
+         Err ("missing an HTML template (needs book.html.typ or html-template in book.conf)");
+         Ok := False;
+         return;
+      end if;
+      if not Ada.Directories.Exists (To_String (C.Html_Template)) then
+         Err ("missing " & To_String (C.Html_Template) & " (the HTML template)");
+         Ok := False;
+         return;
+      end if;
+      if not Ada.Directories.Exists (To_String (C.Outline)) then
+         Err ("missing " & To_String (C.Outline) & " (needed to render the book)");
+         Ok := False;
+         return;
+      end if;
+      if not Ada.Directories.Exists (To_String (C.Src)) then
+         Err ("missing " & To_String (C.Src) & " (needed for the chapter sources)");
+         Ok := False;
+         return;
+      end if;
+
+      --  the same tokens, numbering and chapter files as the PDF, with the HTML
+      --  template; the result is rendered/book-html.typ, so book.typ is untouched
+      begin
+         Errors := Build.Render
+           (To_String (C.Outline), To_String (C.Src), To_String (C.Filemap),
+            To_String (C.Html_Template), To_String (C.Out_Dir),
+            To_String (C.Number_Map), "book-html.typ");
+      exception
+         when E : others =>
+            Err (Ada.Exceptions.Exception_Message (E));
+            Ok := False;
+            return;
+      end;
+      for I in 1 .. Natural (Errors.Length) loop
+         Err (To_String (Errors (I)));
+      end loop;
+
+      if Shell.Run ("command -v typst >/dev/null 2>&1") /= 0 then
+         Err ("missing typst (needed to compile the HTML - install typst-cli)");
+         Ok := False;
+         return;
+      end if;
+      if Shell.Run ("typst compile --features html --format html "
+                    & Sh_Quote (Book_Typ) & " "
+                    & Sh_Quote (To_String (C.Html))) /= 0
+      then
+         Err ("typst failed to compile " & Book_Typ
+              & " (its HTML export needs a recent typst-cli)");
+         Ok := False;
+         return;
+      end if;
+      Msg ("built " & To_String (C.Html));
+      Ok := True;
+   end Run_Html;
 
    procedure Run_Cover (C : Run_Config; Ok : out Boolean) is
       Updated : Boolean;
@@ -452,7 +531,7 @@ procedure Buildabook_Cli is
    -- ── main ────────────────────────────────────────────────────────────────
 
    Sub    : constant Stage := Subcommand;
-   Typst_Ok, Pdf_Ok, Cover_Ok, Check_Ok, Number_Map_Ok, Uuid_Ok, Readme_Ok : Boolean;
+   Typst_Ok, Pdf_Ok, Html_Ok, Cover_Ok, Check_Ok, Number_Map_Ok, Uuid_Ok, Readme_Ok : Boolean;
 
 begin
    if Ada.Command_Line.Argument_Count >= 1
@@ -474,6 +553,9 @@ begin
          when S_Pdf =>
             Run_Pdf (C, Pdf_Ok);
             Ada.Command_Line.Set_Exit_Status (if Pdf_Ok then 0 else 1);
+         when S_Html =>
+            Run_Html (C, Html_Ok);
+            Ada.Command_Line.Set_Exit_Status (if Html_Ok then 0 else 1);
          when S_Cover =>
             Run_Cover (C, Cover_Ok);
             Ada.Command_Line.Set_Exit_Status (if Cover_Ok then 0 else 1);

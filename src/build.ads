@@ -7,7 +7,8 @@ package Build is
 
    Build_Error : exception;
 
-   --  Run the full render.  Fatal problems (missing outline or template)
+   --  Run the full render.  Book_Name is the file written in Out_Dir; the HTML
+   --  stage passes "book-html.typ" so the paged book.typ is left alone.  Fatal problems (missing outline or template)
    --  raise Build_Error; per-file problems (unresolvable tokens, unmatched
    --  headings) are returned in the error list so the caller can report and
    --  keep going.
@@ -17,7 +18,8 @@ package Build is
       Filemap_Path  : String;   -- "" = none
       Template_Path : String;
       Out_Dir       : String;
-      Number_Map    : String) return Materialize.Error_List;
+      Number_Map    : String;
+      Book_Name     : String := "book.typ") return Materialize.Error_List;
 
    --  Write number_map.csv only: parse and number the outline, emit the audit,
    --  and do nothing else.  Raises Build_Error when the outline is missing.

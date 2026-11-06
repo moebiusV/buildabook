@@ -93,6 +93,7 @@ package body Config is
                         C.Src        := To_Unbounded_String (Block_Text (B, "src"));
                         C.Out_Dir    := To_Unbounded_String (Block_Text (B, "out"));
                         C.Template   := To_Unbounded_String (Block_Text (B, "template"));
+                        C.Html_Template := To_Unbounded_String (Block_Text (B, "html-template"));
                         C.Number_Map := To_Unbounded_String (Block_Text (B, "number-map"));
                      elsif K = "cover" and then Length (C.Cover_Src) = 0 then
                         C.Cover_Src := To_Unbounded_String (Block_Text (B, "source"));
