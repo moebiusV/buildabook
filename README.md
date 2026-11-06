@@ -1,3 +1,4 @@
+<!-- {% raw %} -->
 buildabook
 ==========
 
@@ -197,3 +198,5 @@ ISC. See `COPYING`. The authors are in `AUTHORS`; changes are summarised in
 `NEWS`.
 
     https://github.com/moebiusV/buildabook
+
+<!-- {% endraw %} -->

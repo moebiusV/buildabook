@@ -1,3 +1,4 @@
+<!-- {% raw %} -->
 # The Outline Language
 
 The outline file (`outline.txt`) is a plain-text file where each line is a
@@ -301,3 +302,5 @@ Tagline: A brain without a body is a brain without an error-correction mechanism
 The dates are self-contained; `git commit dates are authoritative` for the
 initial population.  A chapter whose `.desc` is missing is skipped and noted on
 standard error, never an error.
+
+<!-- {% endraw %} -->
