@@ -3,6 +3,7 @@ title: buildabook
 description: Build a printable book from Markdown and Typst files, with cover, table of contents, and footnotes
 theme: jekyll-theme-minimal
 exclude:
+  - HANDOFF.md
   - tests
   - src
   - build-aux
