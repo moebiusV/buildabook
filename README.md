@@ -2,7 +2,7 @@
 buildabook
 ==========
 
-Index: [All Projects](https://moebiusv.github.io/) | Git Repository: [github.com/moebiusV/buildabook](https://github.com/moebiusV/buildabook) | `git clone https://github.com/moebiusV/buildabook`
+Parent: [All Projects](https://moebiusv.github.io/) | Git Repo: [github.com/moebiusV/buildabook](https://github.com/moebiusV/buildabook) | `git clone https://github.com/moebiusV/buildabook`
 
 buildabook turns a plain-text outline into a typeset book. One outline file
 drives the chapter numbering, the table of contents, and every
